@@ -1,0 +1,397 @@
+/* ============================================
+   osu!mania Tail Maker — "Neon Precision"
+   Design System & Global Styles
+   ============================================ */
+
+/* --- Font Import --- */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
+/* --- CSS Variables --- */
+:root {
+  /* Background layers */
+  --bg-base: #0b0d17;
+  --bg-panel: #0f111d;
+  --bg-elevated: #151827;
+  --bg-surface: #1b1e30;
+  --bg-input: #11131f;
+
+  /* Border */
+  --border-color: #1e2140;
+
+  /* Typography */
+  --text-primary: #e0e2f0;
+  --text-secondary: #9498b8;
+  --text-muted: #5a5e7a;
+
+  /* Accent: Electric Cyan */
+  --accent-cyan: #00d4f0;
+  --accent-cyan-bg: oklch(0.7 0.16 196 / 0.08);
+
+  /* Accent: Neon Rose (for highlights/alerts) */
+  --accent-rose: #ff2d95;
+
+  /* Semantic */
+  --success: #44ee88;
+  --error: #ff4466;
+
+  /* Spacing */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Shadows */
+  --shadow-glow-cyan: 0 0 12px oklch(0.7 0.16 196 / 0.12);
+  --shadow-glow-rose: 0 0 8px oklch(0.55 0.18 0 / 0.15);
+}
+
+/* --- Reset & Base --- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+/* Subtle grid texture on body */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* --- Shared Section Styles --- */
+.config-section {
+  background: linear-gradient(135deg, var(--bg-elevated), rgba(21,24,39,0.7));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 0;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+/* Subtle top highlight bar on each card */
+.config-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+  transition: opacity 0.25s;
+}
+.config-section:hover {
+  border-color: #2a2d4a;
+  background: linear-gradient(135deg, var(--bg-surface), rgba(27,30,48,0.8));
+  box-shadow: 0 0 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,212,240,0.03);
+}
+.config-section:hover::before {
+  background: linear-gradient(90deg, transparent, oklch(0.7 0.16 196 / 0.1), transparent);
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.section-icon {
+  font-size: 14px;
+  color: var(--accent-cyan);
+}
+
+/* --- Fields --- */
+.field {
+  margin-bottom: 10px;
+}
+.field:last-child {
+  margin-bottom: 0;
+}
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.field-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.field-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.field-info strong {
+  color: var(--accent-cyan);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* --- Inputs --- */
+.input-wrap {
+  position: relative;
+}
+.num-input,
+.text-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.num-input:focus,
+.text-input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: var(--shadow-glow-cyan);
+}
+.num-input {
+  text-align: center;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.num-input::-webkit-inner-spin-button,
+.num-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* --- Sliders --- */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--bg-surface);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  border: 2px solid var(--bg-elevated);
+  cursor: pointer;
+  box-shadow: 0 0 6px oklch(0.7 0.16 196 / 0.4);
+  transition: box-shadow 0.15s;
+}
+.slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 12px oklch(0.7 0.16 196 / 0.6);
+}
+.slider-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent-cyan);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* --- Buttons --- */
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn-primary {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: #0b0d17;
+  font-weight: 600;
+  box-shadow: var(--shadow-glow-cyan);
+}
+.btn-primary:hover {
+  background: oklch(0.72 0.16 196);
+  border-color: oklch(0.72 0.16 196);
+  color: #0b0d17;
+  box-shadow: 0 0 18px oklch(0.7 0.16 196 / 0.25);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.btn-ghost:hover {
+  border-color: transparent;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+}
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.btn-danger {
+  border-color: #3a1a2a;
+  color: #ff6699;
+}
+.btn-danger:hover {
+  border-color: var(--error);
+  color: var(--error);
+  background: oklch(0.3 0.06 0 / 0.3);
+}
+
+/* --- Color Picker (shared) --- */
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.color-picker {
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: transparent;
+  padding: 2px;
+}
+.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
+.color-hex {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+/* --- Toggle --- */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.toggle-label { margin-bottom: 0 !important; }
+.toggle {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.toggle.on {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+}
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+.toggle.on .toggle-knob { transform: translateX(18px); }
+
+/* --- Animations --- */
+.fade-in {
+  animation: fadeSlideIn 0.2s ease-out;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Focus Ring --- */
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 1px;
+}
+
+/* --- Selection --- */
+::selection {
+  background: oklch(0.7 0.16 196 / 0.2);
+  color: var(--accent-cyan);
+}
