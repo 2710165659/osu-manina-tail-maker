@@ -1,5 +1,22 @@
-# Vue 3 + TypeScript + Vite
+# osu!mania Tail Maker
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+生成 osu!mania 模式 `mania-noteL.png`（长按身体 / 投皮）的桌面工具。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## 功能
+
+- 可视化调节投的长度、顶端形状（球皮/菱形/矩形/渐变）、缩放、颜色、透明度
+- 支持留白、身体填充、整体边框
+- 实时预览，缩放/拖拽查看细节
+- 内置预设，一键套用
+- 导出 PNG，直接放入 skin 文件夹使用
+
+## 技术栈
+
+Tauri + Rust + Vue 3 / TypeScript
+
+## 运行
+
+```bash
+npm install
+npm run tauri dev
+```
