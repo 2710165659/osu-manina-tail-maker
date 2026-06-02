@@ -109,7 +109,7 @@ body::before {
   margin-bottom: 0;
   transition: all 0.25s ease;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 /* Subtle top highlight bar on each card */
 .config-section::before {

@@ -17,7 +17,7 @@ const pan = ref({ x: 0, y: 0 })
 let dragging = false
 let ds = { x: 0, y: 0, px: 0, py: 0 }
 
-const bgModes = ['dark70', 'white', 'black', 'green', 'transparent'] as const
+const bgModes = ['dark70', 'white', 'black', 'green'] as const
 type BgMode = typeof bgModes[number]
 const bgMode = ref<BgMode>('dark70')
 const bgLabels: Record<BgMode, string> = {
@@ -25,11 +25,16 @@ const bgLabels: Record<BgMode, string> = {
   white: '纯白',
   black: '纯黑',
   green: '绿幕',
-  transparent: '透明',
 }
 const bgMenuOpen = ref(false)
 function selectBg(m: BgMode) { bgMode.value = m; bgMenuOpen.value = false; paint() }
 function toggleBgMenu() { bgMenuOpen.value = !bgMenuOpen.value }
+
+function resetView() {
+  zoom.value = 100
+  pan.value = { x: 0, y: Math.max(0, (bh.value * 2.5 - ch.value) / 2) }
+  paint()
+}
 
 let bitmap: ImageBitmap | null = null
 const bw = ref(0)
@@ -44,11 +49,11 @@ watch(src, async (url) => {
   bitmap = await createImageBitmap(await r.blob())
   bw.value = bitmap.width; bh.value = bitmap.height
   try { old?.close() } catch {}
-  if (!old) { zoom.value = 100; pan.value = { x: 0, y: -ch.value * 0.15 } }
+  if (!old) { zoom.value = 100; pan.value = { x: 0, y: Math.max(0, (bh.value * 2.5 - ch.value) / 2) } }
   paint()
 })
 
-const s = computed(() => zoom.value / 20)
+const s = computed(() => zoom.value / 40)
 
 // ---- 绘制 ----
 
@@ -80,8 +85,6 @@ function drawMain() {
     ctx.fillStyle = '#000000'; ctx.fillRect(dx, dy, dw, dh)
   } else if (bm === 'green') {
     ctx.fillStyle = '#00ff00'; ctx.fillRect(dx, dy, dw, dh)
-  } else if (bm === 'transparent') {
-    drawPSGrid(ctx, dx, dy, dw, dh)
   } else {
     // dark70 (default)
     drawPSGrid(ctx, dx, dy, dw, dh)
@@ -194,7 +197,7 @@ function vlabel(ctx: CanvasRenderingContext2D, t: string, x: number, y: number, 
 
 function onMD(e: MouseEvent) { dragging = true; ds = { x: e.clientX, y: e.clientY, px: pan.value.x, py: pan.value.y } }
 function onMM(e: MouseEvent) { if (!dragging) return; pan.value = { x: ds.px + (e.clientX - ds.x), y: ds.py + (e.clientY - ds.y) }; paint() }
-function onMU() { dragging = false; bgMenuOpen.value = false }
+function onMU() { dragging = false }
 function onWh(e: WheelEvent) { e.preventDefault(); zoom.value = Math.max(1, Math.min(400, zoom.value + (e.deltaY > 0 ? -5 : 5))) }
 
 let ro: ResizeObserver | null = null
@@ -219,7 +222,8 @@ watch([s, cw, ch], paint, { flush: 'post' })
     <div ref="container" class="cv" @mousedown="onMD" @mousemove="onMM" @mouseup="onMU" @mouseleave="onMU" @wheel="onWh">
       <canvas ref="mainCanvas" class="c1"></canvas>
       <canvas ref="annoCanvas" class="c2"></canvas>
-      <div class="bg-wrap">
+      <div class="bg-wrap" @mousedown.stop @mouseup.stop>
+        <button class="bg-btn" @click="resetView">恢复视角</button>
         <button class="bg-btn" @click="toggleBgMenu">切换背景</button>
         <div v-if="bgMenuOpen" class="bg-drop">
           <button v-for="m in bgModes" :key="m" :class="['bg-opt', { on: bgMode === m }]" @click="selectBg(m)">{{ bgLabels[m] }}</button>
@@ -252,8 +256,8 @@ watch([s, cw, ch], paint, { flush: 'post' })
 .c2 { pointer-events:none }
 .ph { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--text-muted); font-size:13px; z-index:2 }
 .ph svg { opacity:.4 }
-.bg-wrap { position:absolute; top:8px; right:8px; z-index:10 }
-.bg-btn { padding:5px 14px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.15); border-radius:5px; color:rgba(255,255,255,0.65); font-size:12px; cursor:pointer; font-family:inherit; white-space:nowrap }
+.bg-wrap { position:absolute; top:8px; right:8px; z-index:10; display:flex; gap:4px }
+.bg-btn { padding:5px 10px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.15); border-radius:5px; color:rgba(255,255,255,0.65); font-size:12px; cursor:pointer; font-family:inherit; white-space:nowrap; line-height:1 }
 .bg-btn:hover { background:rgba(0,0,0,0.75); border-color:var(--accent-cyan); color:var(--accent-cyan) }
 .bg-drop { position:absolute; top:100%; right:0; margin-top:4px; background:rgba(15,17,29,0.95); border:1px solid var(--border-color); border-radius:5px; overflow:hidden; min-width:100px }
 .bg-opt { display:block; width:100%; padding:6px 14px; background:transparent; border:none; color:var(--text-secondary); font-size:12px; cursor:pointer; text-align:left; font-family:inherit; white-space:nowrap }

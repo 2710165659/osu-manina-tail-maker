@@ -40,7 +40,13 @@ const filenameModel = computed({
     </h3>
     <div class="field-grid">
       <div class="field">
-        <label class="field-label">宽度 <span class="unit">px</span></label>
+        <label class="field-label">
+          宽度 <span class="unit">px</span>
+          <span class="help-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+            <span class="help-tip">lazer必须设置为skini里ColumnWidth值的1.6倍才不会变形。</span>
+          </span>
+        </label>
         <div class="input-wrap">
           <input
             v-model.number="widthModel"
@@ -53,7 +59,13 @@ const filenameModel = computed({
         <p v-if="widthWarn" class="warn">{{ widthWarn }}</p>
       </div>
       <div class="field">
-        <label class="field-label">高度 <span class="unit">px</span></label>
+        <label class="field-label">
+          高度 <span class="unit">px</span>
+          <span class="help-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+            <span class="help-tip">lazer推荐32800，否则可能导致尾部变形。stable推荐32767。</span>
+          </span>
+        </label>
         <div class="input-wrap">
           <input
             v-model.number="heightModel"
@@ -66,7 +78,13 @@ const filenameModel = computed({
       </div>
     </div>
     <div class="field">
-      <label class="field-label">图片名称</label>
+      <label class="field-label">
+        图片名称
+        <span class="help-icon">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+          <span class="help-tip">因lazer加载问题对于此图片来说2x反而不如1x清晰。</span>
+        </span>
+      </label>
       <div class="input-wrap input-with-suffix">
         <input
           v-model="filenameModel"
@@ -110,4 +128,9 @@ const filenameModel = computed({
   background: var(--bg-input);
   padding-left: 4px;
 }
+.help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: var(--text-muted); cursor: help; position: relative; vertical-align: middle; margin-left: 3px; transition: color .15s }
+.help-icon:hover { color: var(--accent-cyan) }
+.help-tip { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 5px 10px; background: rgba(15,17,29,0.97); border: 1px solid var(--border-color); border-radius: 4px; font-size: 11px; color: var(--text-primary); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s; font-weight: 400; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.5) }
+.help-tip:hover { white-space: normal; max-width: 280px }
+.help-icon:hover .help-tip { opacity: 1 }
 </style>

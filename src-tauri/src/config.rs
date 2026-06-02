@@ -65,6 +65,7 @@ pub struct RgbaColor {
 impl RgbaColor {
     pub const WHITE: Self = Self { r: 255, g: 255, b: 255, a: 255 };
     pub const BLACK: Self = Self { r: 0, g: 0, b: 0, a: 255 };
+    pub const GREY: Self = Self { r: 113, g: 113, b: 113, a: 255 };
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,24 +86,24 @@ impl TailConfig {
     pub fn default_config() -> Self {
         Self {
             image: ImageConfig {
-                width: 40,
+                width: 100,
                 height: 32800,
                 filename: "mania-noteL".to_string(),
             },
-            margin: 3,
+            margin: 8,
             throw_length: 100,
             cap: CapConfig {
                 shape: CapShape::Ball,
                 scale: 100,
-                color: RgbaColor::WHITE,
+                color: RgbaColor::GREY,
                 independent_opacity: false,
                 opacity: 255,
             },
             body: BodyConfig {
-                fill_color: RgbaColor::WHITE,
+                fill_color: RgbaColor::GREY,
                 fill_opacity: 255,
                 border_enabled: false,
-                border_color: RgbaColor::BLACK,
+                border_color: RgbaColor::WHITE,
                 border_opacity: 255,
                 border_width: 1,
             },
