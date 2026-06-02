@@ -73,7 +73,6 @@ export function useConfig() {
   }
 
   async function savePreset(name: string) {
-    // 用户预设存储在前端 localStorage，后续可通过 Tauri 持久化
     const newPreset: Preset = {
       name,
       config: JSON.parse(JSON.stringify(config)),
@@ -88,18 +87,17 @@ export function useConfig() {
     } else {
       presets.value.push(newPreset)
     }
-    // 持久化到 localStorage
-    saveUserPresets()
+    await persistUserPresets()
   }
 
-  function deletePreset(name: string) {
+  async function deletePreset(name: string) {
     const idx = presets.value.findIndex(p => p.name === name)
     if (idx < 0) return
     if (presets.value[idx].builtin) {
       throw new Error(`不能删除内置预设 "${name}"`)
     }
     presets.value.splice(idx, 1)
-    saveUserPresets()
+    await persistUserPresets()
   }
 
   function resetConfig() {
@@ -107,23 +105,15 @@ export function useConfig() {
     updatePreview()
   }
 
-  // 用户预设持久化
-  function saveUserPresets() {
+  // 持久化用户预设到 app data 目录
+  async function persistUserPresets() {
     const userPresets = presets.value.filter(p => !p.builtin)
-    localStorage.setItem('user-presets', JSON.stringify(userPresets))
+    await invoke('save_user_presets', { presets: userPresets })
   }
 
+  // init 中 get_presets 已返回合并后的全部预设，无需额外加载
   function loadUserPresets() {
-    try {
-      const raw = localStorage.getItem('user-presets')
-      if (raw) {
-        const userPresets: Preset[] = JSON.parse(raw)
-        // 合并：内置 + 用户（去重）
-        const builtinNames = new Set(presets.value.filter(p => p.builtin).map(p => p.name))
-        const filtered = userPresets.filter(p => !builtinNames.has(p.name))
-        presets.value = [...presets.value.filter(p => p.builtin), ...filtered]
-      }
-    } catch { /* ignore */ }
+    // 预设已在 init() 中通过 get_presets 加载完毕
   }
 
   // --- 便捷更新方法 ---
