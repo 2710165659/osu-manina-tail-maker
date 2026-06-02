@@ -33,6 +33,10 @@ const opacityModel = computed({
   get: () => config.cap.opacity,
   set: (v: number) => setCapProp('opacity', Math.max(0, Math.min(255, v))),
 })
+
+const tipText = ref('')
+function showTip(text: string) { tipText.value = text }
+function hideTip() { tipText.value = '' }
 </script>
 
 <template>
@@ -77,13 +81,15 @@ const opacityModel = computed({
     </div>
 
     <div class="field">
-      <label class="field-label">
-        顶端缩放
-        <span class="help-icon" title="值越小圆越扁">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
-          <span class="help-tip">值越小圆越扁</span>
-        </span>
-      </label>
+      <div class="label-wrap">
+        <label class="field-label">
+          顶端缩放
+          <span class="help-icon" @mouseenter="showTip('值越小圆越扁')" @mouseleave="hideTip">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+          </span>
+        </label>
+        <div v-if="tipText" class="help-tip-banner">{{ tipText }}</div>
+      </div>
       <div class="scale-row">
         <input v-model.number="capScaleModel" type="range" min="1" max="500" class="slider" @input="applyScale(capScaleModel)" />
         <input
@@ -126,6 +132,7 @@ const opacityModel = computed({
         <span class="slider-val">{{ opacityModel }}</span>
       </div>
     </div>
+
   </section>
 </template>
 
@@ -139,11 +146,29 @@ const opacityModel = computed({
 .scale-row { display: flex; align-items: center; gap: 8px; }
 .scale-row .slider { flex: 1; }
 .scale-num { width: 60px; }
-.help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: var(--text-muted); cursor: help; position: relative; vertical-align: middle; margin-left: 3px; transition: color .15s }
+.help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: var(--text-muted); cursor: help; vertical-align: middle; margin-left: 3px; transition: color .15s }
 .help-icon:hover { color: var(--accent-cyan) }
-.help-tip { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 5px 10px; background: rgba(15,17,29,0.97); border: 1px solid var(--border-color); border-radius: 4px; font-size: 11px; color: var(--text-primary); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s; font-weight: 400; z-index: 99999; box-shadow: 0 4px 16px rgba(0,0,0,0.5) }
-.help-tip:hover { white-space: normal; max-width: 280px }
-.help-icon:hover .help-tip { opacity: 1 }
+.label-wrap { position: relative; }
+.help-tip-banner {
+  position: absolute;
+  bottom: 100%;
+  left: -30px;                   /* 扩展到 panel-scroll 内容区左边界 */
+  right: -30px;                  /* 扩展到 panel-scroll 内容区右边界 */
+  margin-bottom: 2px;            /* 紧挨 label 上方 */
+  padding: 4px 14px;             /* 左右 padding 与 panel-scroll 一致 */
+  background: rgba(15,17,29,0.97);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  text-align: left;
+  white-space: normal;
+  word-break: break-all;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
 .color-row { display: flex; align-items: center; gap: 6px; }
 .color-picker { width: 30px; height: 30px; border: 2px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; background: transparent; padding: 2px; }
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
