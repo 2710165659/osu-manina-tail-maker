@@ -26,6 +26,7 @@ pub fn run() {
             get_presets,
             get_default_config,
             save_user_presets,
+            render_preset_thumbnail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

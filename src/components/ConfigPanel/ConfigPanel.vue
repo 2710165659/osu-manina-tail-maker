@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import ImageSection from './ImageSection.vue'
-import MarginSection from './MarginSection.vue'
+import GlobalAppearanceSection from './GlobalAppearanceSection.vue'
 import CapSection from './CapSection.vue'
 import BodySection from './BodySection.vue'
-import GlobalSection from './GlobalSection.vue'
-import PresetSection from './PresetSection.vue'
 
 const loaded = ref(false)
 onMounted(() => { loaded.value = true })
@@ -49,19 +47,13 @@ onMounted(() => { loaded.value = true })
         <ImageSection />
       </div>
       <div :class="['section-wrapper', { visible: loaded }]" style="--i:1">
-        <MarginSection />
+        <GlobalAppearanceSection />
       </div>
       <div :class="['section-wrapper', { visible: loaded }]" style="--i:2">
         <CapSection />
       </div>
       <div :class="['section-wrapper', { visible: loaded }]" style="--i:3">
         <BodySection />
-      </div>
-      <div :class="['section-wrapper', { visible: loaded }]" style="--i:4">
-        <GlobalSection />
-      </div>
-      <div :class="['section-wrapper', { visible: loaded }]" style="--i:5">
-        <PresetSection />
       </div>
     </div>
   </aside>

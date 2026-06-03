@@ -2,8 +2,9 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 import ExportBar from './ExportBar.vue'
+import PresetPanel from './PresetPanel.vue'
 
-const { config, previewBase64, previewLoading } = useConfig()
+const { config, previewBase64, previewLoading, resetConfig } = useConfig()
 
 const container = ref<HTMLDivElement>()
 const mainCanvas = ref<HTMLCanvasElement>()
@@ -29,6 +30,24 @@ const bgLabels: Record<BgMode, string> = {
 const bgMenuOpen = ref(false)
 function selectBg(m: BgMode) { bgMode.value = m; bgMenuOpen.value = false; paint() }
 function toggleBgMenu() { bgMenuOpen.value = !bgMenuOpen.value }
+
+// 预设面板
+const showPresetPanel = ref(false)
+
+// 重置（二次确认）
+const resetConfirming = ref(false)
+let resetTimer: ReturnType<typeof setTimeout> | null = null
+function handleReset() {
+  if (resetConfirming.value) {
+    resetConfig()
+    resetView()
+    resetConfirming.value = false
+    if (resetTimer) { clearTimeout(resetTimer); resetTimer = null }
+  } else {
+    resetConfirming.value = true
+    resetTimer = setTimeout(() => { resetConfirming.value = false; resetTimer = null }, 2000)
+  }
+}
 
 function resetView() {
   zoom.value = 100
@@ -215,7 +234,25 @@ watch([s, cw, ch], paint, { flush: 'post' })
 <template>
   <div class="preview-panel">
     <div class="topbar">
-      <span></span>
+      <div class="topbar-left">
+        <button class="preset-trigger" @click="showPresetPanel = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+            <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+            <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+            <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          </svg>
+          预设
+        </button>
+        <button :class="['reset-trigger', { confirming: resetConfirming }]" @click="handleReset">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M2 7a5 5 0 0 1 9.33-2.5M12 7a5 5 0 0 1-9.33 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M11.5 1.5v3h-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2.5 12.5v-3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {{ resetConfirming ? '确认重置？' : '重置' }}
+        </button>
+      </div>
       <span class="st"><span :class="['dot', previewLoading ? 'ld' : 'ok']"></span>{{ previewLoading ? '渲染中' : '预览' }}</span>
     </div>
 
@@ -235,12 +272,62 @@ watch([s, cw, ch], paint, { flush: 'post' })
       </div>
     </div>
     <ExportBar />
+
+    <!-- 预设面板弹出层 -->
+    <PresetPanel v-if="showPresetPanel" @close="showPresetPanel = false" />
   </div>
 </template>
 
 <style scoped>
 .preview-panel { flex:1; display:flex; flex-direction:column; height:100vh; overflow:hidden; background:var(--bg-base) }
 .topbar { display:flex; align-items:center; justify-content:space-between; padding:0 18px; height:44px; background:var(--bg-panel); border-bottom:1px solid var(--border-color); flex-shrink:0 }
+.topbar-left { display:flex; align-items:center; gap:6px }
+.preset-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.preset-trigger:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+.reset-trigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.reset-trigger:hover {
+  background: var(--bg-elevated);
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
+}
+.reset-trigger.confirming {
+  border-color: #ff4466;
+  color: #ff4466;
+  background: oklch(0.35 0.08 16 / 0.3);
+}
+.reset-trigger.confirming:hover {
+  background: oklch(0.4 0.1 16 / 0.4);
+}
 .zoom-row { display:flex; align-items:center; gap:4px }
 .zi { width:52px; padding:3px 4px; text-align:center; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; font-family:'JetBrains Mono',monospace; outline:none }
 .zi:focus { border-color:var(--accent-cyan) }

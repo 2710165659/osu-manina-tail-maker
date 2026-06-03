@@ -2,7 +2,10 @@ use crate::config::{Preset, TailConfig, ValidationResult};
 use crate::preset;
 use crate::renderer;
 use base64::Engine;
+use image::ImageBuffer;
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -110,4 +113,81 @@ pub fn save_user_presets(app: tauri::AppHandle, presets: Vec<Preset>) -> Result<
 #[tauri::command]
 pub fn get_default_config() -> TailConfig {
     TailConfig::default_config()
+}
+
+/// 缓存目录：%LOCALAPPDATA%/osu-mania-tail-maker/cache
+fn cache_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("LOCALAPPDATA") {
+        PathBuf::from(dir).join("osu-mania-tail-maker").join("cache")
+    } else {
+        PathBuf::from("cache")
+    }
+}
+
+/// 根据配置 JSON 计算 hash 作为缓存文件名
+fn config_hash(config: &TailConfig) -> String {
+    let json = serde_json::to_string(config).unwrap_or_default();
+    let mut hasher = DefaultHasher::new();
+    json.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+/// 渲染预设缩略图（带磁盘缓存）
+/// 以第一个非透明行为基准，上方留 50px，下方留 200px
+#[tauri::command]
+pub fn render_preset_thumbnail(config: TailConfig) -> Result<String, String> {
+    let hash = config_hash(&config);
+    let cache_path = cache_dir().join(format!("{}.png", hash));
+
+    // 缓存命中
+    if cache_path.exists() {
+        if let Ok(bytes) = fs::read(&cache_path) {
+            return Ok(base64::engine::general_purpose::STANDARD.encode(&bytes));
+        }
+    }
+
+    // 缓存未命中，渲染预览
+    let preview = renderer::render_preview(&config);
+    let (w, h) = (preview.width(), preview.height());
+
+    // 找到第一个非透明行
+    let mut first_row = 0u32;
+    'outer: for y in 0..h {
+        for x in 0..w {
+            if preview.get_pixel(x, y)[3] > 0 {
+                first_row = y;
+                break 'outer;
+            }
+        }
+    }
+
+    // 裁剪：上方留 50px，下方留 200px
+    let pad_top: u32 = 50;
+    let pad_bottom: u32 = 200;
+    let crop_top = first_row.saturating_sub(pad_top);
+    let crop_bottom = (first_row + pad_bottom).min(h);
+    let crop_h = crop_bottom.saturating_sub(crop_top);
+
+    let cropped: image::RgbaImage = if crop_h > 0 {
+        ImageBuffer::from_fn(w, crop_h, |x, y| {
+            *preview.get_pixel(x, crop_top + y)
+        })
+    } else {
+        ImageBuffer::from_pixel(w, 1, image::Rgba([0, 0, 0, 0]))
+    };
+
+    // 编码 PNG
+    let mut png_bytes = Vec::new();
+    let mut cursor = Cursor::new(&mut png_bytes);
+    image::DynamicImage::ImageRgba8(cropped)
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| format!("PNG 编码失败: {}", e))?;
+
+    // 写入缓存
+    if let Some(parent) = cache_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(&cache_path, &png_bytes);
+
+    Ok(base64::engine::general_purpose::STANDARD.encode(&png_bytes))
 }
