@@ -73,20 +73,20 @@ export function useConfig() {
   }
 
   async function savePreset(name: string) {
+    // 自动处理重名：原名称(1), 原名称(2), ...
+    let finalName = name
+    const existingNames = new Set(presets.value.map(p => p.name))
+    if (existingNames.has(finalName)) {
+      let i = 1
+      while (existingNames.has(`${name}(${i})`)) i++
+      finalName = `${name}(${i})`
+    }
     const newPreset: Preset = {
-      name,
+      name: finalName,
       config: JSON.parse(JSON.stringify(config)),
       builtin: false,
     }
-    const existing = presets.value.findIndex(p => p.name === name)
-    if (existing >= 0) {
-      if (presets.value[existing].builtin) {
-        throw new Error(`不能覆盖内置预设 "${name}"`)
-      }
-      presets.value[existing] = newPreset
-    } else {
-      presets.value.push(newPreset)
-    }
+    presets.value.push(newPreset)
     await persistUserPresets()
   }
 

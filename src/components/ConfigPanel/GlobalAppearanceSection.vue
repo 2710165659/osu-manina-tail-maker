@@ -111,8 +111,7 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
           class="slider"
         />
         <div class="opacity-value">
-          <span class="slider-val">{{ opacityModel }}</span>
-          <span class="opacity-pct">/ {{ pct }}%</span>
+          <span class="opacity-pct">{{ pct }}%</span>
         </div>
       </div>
       <div class="field-info">

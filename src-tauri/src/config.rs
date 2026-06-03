@@ -145,9 +145,10 @@ impl TailConfig {
         self.image.width.saturating_sub(self.margin * 2)
     }
 
-    /// 顶端渲染高度 = scale × content_width / 200
+    /// 顶端渲染高度 = scale × content_width / 200（渐变形状基准翻倍）
     pub fn cap_height(&self) -> u32 {
-        (self.cap.scale as u64 * self.content_width() as u64 / 200) as u32
+        let divisor = if self.cap.shape == CapShape::Gradient { 100 } else { 200 };
+        (self.cap.scale as u64 * self.content_width() as u64 / divisor) as u32
     }
 
     /// 身体高度

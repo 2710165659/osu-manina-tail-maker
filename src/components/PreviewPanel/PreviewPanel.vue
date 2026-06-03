@@ -31,8 +31,10 @@ const bgMenuOpen = ref(false)
 function selectBg(m: BgMode) { bgMode.value = m; bgMenuOpen.value = false; paint() }
 function toggleBgMenu() { bgMenuOpen.value = !bgMenuOpen.value }
 
-// 预设面板
+// 弹出面板
 const showPresetPanel = ref(false)
+const showToolboxPanel = ref(false)
+const showImportPanel = ref(false)
 
 // 重置（二次确认）
 const resetConfirming = ref(false)
@@ -146,7 +148,8 @@ function drawAnno() {
   // 直接按位图像素 × 缩放计算，不依赖全图高度
   const throwY0 = dy
   const throwY1 = dy + config.throwLength * s.value
-  const capHpx = config.cap.scale * (config.image.width - config.margin * 2) / 200
+  const capDivisor = config.cap.shape === 'gradient' ? 100 : 200
+  const capHpx = config.cap.scale * (config.image.width - config.margin * 2) / capDivisor
   const capEndY = dy + (config.throwLength + capHpx) * s.value
 
   ctx.font = '10px "JetBrains Mono", monospace'
@@ -235,7 +238,15 @@ watch([s, cw, ch], paint, { flush: 'post' })
   <div class="preview-panel">
     <div class="topbar">
       <div class="topbar-left">
-        <button class="preset-trigger" @click="showPresetPanel = true">
+        <button class="topbar-trigger" @click="showToolboxPanel = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="5" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.1"/>
+            <path d="M4 5V3a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+            <line x1="7" y1="8" x2="7" y2="11" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+          </svg>
+          工具箱
+        </button>
+        <button class="topbar-trigger" @click="showPresetPanel = true">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
             <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
@@ -243,6 +254,13 @@ watch([s, cw, ch], paint, { flush: 'post' })
             <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
           </svg>
           预设
+        </button>
+        <button class="topbar-trigger" @click="showImportPanel = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 2v7M4 6.5 7 9.5 10 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 9v2.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+          </svg>
+          导入图片
         </button>
         <button :class="['reset-trigger', { confirming: resetConfirming }]" @click="handleReset">
           <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -275,6 +293,36 @@ watch([s, cw, ch], paint, { flush: 'post' })
 
     <!-- 预设面板弹出层 -->
     <PresetPanel v-if="showPresetPanel" @close="showPresetPanel = false" />
+
+    <!-- 工具箱面板 -->
+    <div v-if="showToolboxPanel" class="panel-overlay" @click.self="showToolboxPanel = false">
+      <div class="overlay-panel">
+        <div class="overlay-header">
+          <span class="overlay-title">工具箱</span>
+          <button class="close-btn" @click="showToolboxPanel = false">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="overlay-body">
+          <div class="empty-hint">暂无工具</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导入图片面板 -->
+    <div v-if="showImportPanel" class="panel-overlay" @click.self="showImportPanel = false">
+      <div class="overlay-panel">
+        <div class="overlay-header">
+          <span class="overlay-title">导入图片</span>
+          <button class="close-btn" @click="showImportPanel = false">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="overlay-body">
+          <div class="empty-hint">暂无内容</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -282,11 +330,11 @@ watch([s, cw, ch], paint, { flush: 'post' })
 .preview-panel { flex:1; display:flex; flex-direction:column; height:100vh; overflow:hidden; background:var(--bg-base) }
 .topbar { display:flex; align-items:center; justify-content:space-between; padding:0 18px; height:44px; background:var(--bg-panel); border-bottom:1px solid var(--border-color); flex-shrink:0 }
 .topbar-left { display:flex; align-items:center; gap:6px }
-.preset-trigger {
+.topbar-trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
+  gap: 5px;
+  padding: 5px 10px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -296,7 +344,7 @@ watch([s, cw, ch], paint, { flush: 'post' })
   cursor: pointer;
   transition: all 0.15s;
 }
-.preset-trigger:hover {
+.topbar-trigger:hover {
   background: var(--bg-elevated);
   border-color: var(--accent-cyan);
   color: var(--accent-cyan);
@@ -328,6 +376,78 @@ watch([s, cw, ch], paint, { flush: 'post' })
 .reset-trigger.confirming:hover {
   background: oklch(0.4 0.1 16 / 0.4);
 }
+
+/* 通用弹出面板 */
+.panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: panelFadeIn 0.2s ease-out;
+}
+@keyframes panelFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.overlay-panel {
+  width: 820px;
+  max-width: 92vw;
+  max-height: 85vh;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 212, 240, 0.3);
+  animation: panelSlideUp 0.25s ease-out;
+}
+@keyframes panelSlideUp { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.overlay-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+.close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.close-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.overlay-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.empty-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .zoom-row { display:flex; align-items:center; gap:4px }
 .zi { width:52px; padding:3px 4px; text-align:center; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; font-family:'JetBrains Mono',monospace; outline:none }
 .zi:focus { border-color:var(--accent-cyan) }

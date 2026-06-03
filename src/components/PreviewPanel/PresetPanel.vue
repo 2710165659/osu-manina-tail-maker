@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useConfig } from '../../composables/useConfig'
 import type { Preset } from '../../types/config'
@@ -17,15 +17,16 @@ const showSaveInput = ref(false)
 const newPresetName = ref('')
 const saveError = ref('')
 
-function handleSave() {
+async function handleSave() {
   const name = newPresetName.value.trim()
   if (!name) { saveError.value = '请输入预设名称'; return }
   try {
-    savePreset(name)
+    await savePreset(name)
+    const added = presets.value[presets.value.length - 1]
     newPresetName.value = ''
     showSaveInput.value = false
     saveError.value = ''
-    nextTick(() => renderThumbForPreset(presets.value.find(p => p.name === name)!))
+    if (added) renderThumbForPreset(added)
   } catch (e: any) {
     saveError.value = e.message || String(e)
   }
