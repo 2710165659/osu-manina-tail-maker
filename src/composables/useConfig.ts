@@ -1,7 +1,7 @@
 import { ref, reactive, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { TailConfig, Preset } from '../types/config'
-import { createDefaultConfig, hexToRgba, rgbaToHex } from '../types/config'
+import type { TailConfig, Preset, CapConfig, BodyConfig, ImageConfig } from '../types/config'
+import { createDefaultConfig, hexToRgba, rgbaToHex, getDefaultField } from '../types/config'
 
 // 全局单例状态
 const config = reactive<TailConfig>(createDefaultConfig())
@@ -139,6 +139,30 @@ export function useConfig() {
     config.body.borderColor = hexToRgba(hex, config.body.borderColor.a)
   }
 
+  /** 恢复顶层字段为默认值 */
+  function resetField<K extends keyof TailConfig>(field: K) {
+    const def = getDefaultField(field) as TailConfig[K]
+    ;(config as any)[field] = def
+  }
+
+  /** 恢复 cap 子字段为默认值 */
+  function resetCapField<K extends keyof CapConfig>(field: K) {
+    const def = getDefaultField('cap') as CapConfig
+    ;(config.cap as any)[field] = def[field]
+  }
+
+  /** 恢复 body 子字段为默认值 */
+  function resetBodyField<K extends keyof BodyConfig>(field: K) {
+    const def = getDefaultField('body') as BodyConfig
+    ;(config.body as any)[field] = def[field]
+  }
+
+  /** 恢复 image 子字段为默认值 */
+  function resetImageField<K extends keyof ImageConfig>(field: K) {
+    const def = getDefaultField('image') as ImageConfig
+    ;(config.image as any)[field] = def[field]
+  }
+
   return {
     config,
     presets,
@@ -161,6 +185,10 @@ export function useConfig() {
     setCapColorFromHex,
     setBodyFillColorFromHex,
     setBodyBorderColorFromHex,
+    resetField,
+    resetCapField,
+    resetBodyField,
+    resetImageField,
     // helpers
     rgbaToHex,
     hexToRgba,

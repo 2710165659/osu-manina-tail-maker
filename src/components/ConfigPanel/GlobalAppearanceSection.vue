@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { rgbaToHex, hexToRgba } from '../../types/config'
+import { rgbaToHex, hexToRgba, isFieldDefault, isBodyFieldDefault } from '../../types/config'
+import RevertButton from './RevertButton.vue'
 
-const { config, setBodyProp } = useConfig()
+const { config, setBodyProp, resetField, resetBodyField } = useConfig()
 
 // ── 留白 ──
 const marginMax = computed(() => Math.floor((config.image.width - 1) / 2))
@@ -54,10 +55,13 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
 
     <!-- 留白 -->
     <div class="subsection">
-      <label class="field-label">
-        留白 <span class="unit">px</span>
-        <span class="field-hint">（左右对称）</span>
-      </label>
+      <div class="label-row">
+        <label class="field-label">
+          留白 <span class="unit">px</span>
+          <span class="field-hint">（左右对称）</span>
+        </label>
+        <RevertButton :visible="!isFieldDefault(config, 'margin')" @revert="resetField('margin')" />
+      </div>
       <div class="input-wrap">
         <input
           v-model.number="marginModel"
@@ -75,7 +79,10 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
     <!-- 边框 -->
     <div class="subsection">
       <div class="toggle-row">
-        <label class="field-label toggle-label">边框</label>
+        <div class="label-row">
+          <label class="field-label toggle-label">边框</label>
+          <RevertButton :visible="!isBodyFieldDefault(config, 'borderEnabled')" @revert="resetBodyField('borderEnabled')" />
+        </div>
         <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); if (!next) { config.body.borderColor = { r: 255, g: 255, b: 255, a: 255 }; setBodyProp('borderOpacity', 255); setBodyProp('borderWidth', 1) } }">
           <span class="toggle-knob"></span>
         </button>
@@ -102,7 +109,10 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
 
     <!-- 整体透明度 -->
     <div class="subsection">
-      <label class="field-label">整体透明度</label>
+      <div class="label-row">
+        <label class="field-label">整体透明度</label>
+        <RevertButton :visible="!isFieldDefault(config, 'globalOpacity')" @revert="resetField('globalOpacity')" />
+      </div>
       <div class="opacity-row">
         <input
           v-model.number="opacityModel"
@@ -124,7 +134,7 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
 
 <style scoped>
 .section-icon-svg {
-  color: var(--accent-cyan);
+  color: var(--accent-purple);
   flex-shrink: 0;
 }
 .subsection {
@@ -133,13 +143,19 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
 .subsection:last-child {
   margin-bottom: 0;
 }
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
 .border-settings {
   margin-top: 8px;
   padding: 10px;
   background: var(--bg-input);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  border-left: 2px solid var(--accent-cyan);
+  border-left: 2px solid var(--accent-purple);
 }
 .narrow { max-width: 80px; }
 .color-row { display: flex; align-items: center; gap: 6px; }
@@ -147,13 +163,9 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
 .hex-input { width: 72px; padding: 4px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
-.hex-input:focus { border-color: var(--accent-cyan); }
+.hex-input:focus { border-color: var(--accent-purple); }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-label { margin-bottom: 0 !important; }
-.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.08); position: relative; cursor: pointer; transition: all 0.2s; }
-.toggle.on { background: var(--accent-cyan); border-color: var(--accent-cyan); }
-.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #555; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: all 0.2s; }
-.toggle.on .toggle-knob { transform: translateX(18px); background: #fff; box-shadow: none; }
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .opacity-row {

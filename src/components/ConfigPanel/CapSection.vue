@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba } from '../../types/config'
+import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, isFieldDefault, isCapFieldDefault } from '../../types/config'
+import RevertButton from './RevertButton.vue'
 
-const { config, setCapProp } = useConfig()
+const { config, setCapProp, resetField, resetCapField } = useConfig()
 const shapes = CAP_SHAPE_ORDER
 
 const throwMax = computed(() => Math.max(0, config.image.height - 1))
@@ -51,14 +52,20 @@ function hideTip() { tipText.value = '' }
     </h3>
 
     <div class="field">
-      <label class="field-label">投的长度 <span class="unit">px</span></label>
+      <div class="label-row">
+        <label class="field-label">投的长度 <span class="unit">px</span></label>
+        <RevertButton :visible="!isFieldDefault(config, 'throwLength')" @revert="resetField('throwLength')" />
+      </div>
       <div class="input-wrap">
         <input v-model.number="throwModel" type="number" :min="0" :max="throwMax" class="num-input" />
       </div>
     </div>
 
     <div class="field">
-      <label class="field-label">顶端形状</label>
+      <div class="label-row">
+        <label class="field-label">顶端形状</label>
+        <RevertButton :visible="!isCapFieldDefault(config, 'shape')" @revert="resetCapField('shape')" />
+      </div>
       <div class="shape-selector">
         <button v-for="s in shapes" :key="s" :class="['shape-btn', { active: config.cap.shape === s }]" @click="setCapProp('shape', s)">
           <svg class="shape-preview-svg" width="20" height="16" viewBox="0 0 20 16" fill="none">
@@ -83,12 +90,15 @@ function hideTip() { tipText.value = '' }
 
     <div class="field">
       <div class="label-wrap">
-        <label class="field-label">
-          顶端缩放
-          <span class="help-icon" @mouseenter="showTip('值越小圆越扁')" @mouseleave="hideTip">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
-          </span>
-        </label>
+        <div class="label-row">
+          <label class="field-label">
+            顶端缩放
+            <span class="help-icon" @mouseenter="showTip('值越小圆越扁')" @mouseleave="hideTip">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+            </span>
+          </label>
+          <RevertButton :visible="!isCapFieldDefault(config, 'scale')" @revert="resetCapField('scale')" />
+        </div>
         <div v-if="tipText" class="help-tip-banner">{{ tipText }}</div>
       </div>
       <div class="scale-row">
@@ -104,7 +114,10 @@ function hideTip() { tipText.value = '' }
     </div>
 
     <div class="field">
-      <label class="field-label">顶端颜色</label>
+      <div class="label-row">
+        <label class="field-label">顶端颜色</label>
+        <RevertButton :visible="!isCapFieldDefault(config, 'color')" @revert="resetCapField('color')" />
+      </div>
       <div class="color-row">
         <input type="color" :value="rgbaToHex(config.cap.color)" class="color-picker" @input="applyCapHex(($event.target as HTMLInputElement).value)" />
         <input
@@ -119,7 +132,10 @@ function hideTip() { tipText.value = '' }
 
     <div class="field">
       <div class="toggle-row">
-        <label class="field-label toggle-label">独立透明度</label>
+        <div class="label-row">
+          <label class="field-label toggle-label">独立透明度</label>
+          <RevertButton :visible="!isCapFieldDefault(config, 'independentOpacity')" @revert="resetCapField('independentOpacity')" />
+        </div>
         <button :class="['toggle', { on: config.cap.independentOpacity }]" @click="() => { const next = !config.cap.independentOpacity; setCapProp('independentOpacity', next); if (!next) setCapProp('opacity', 255) }">
           <span class="toggle-knob"></span>
         </button>
@@ -138,25 +154,26 @@ function hideTip() { tipText.value = '' }
 </template>
 
 <style scoped>
-.section-icon-svg { color: var(--accent-cyan); flex-shrink: 0; }
+.section-icon-svg { color: var(--accent-purple); flex-shrink: 0; }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .shape-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .shape-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; font-size: 12px; }
-.shape-btn:hover { border-color: var(--accent-cyan); color: var(--text-primary); background: var(--bg-elevated); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-.shape-btn.active { background: var(--accent-cyan-bg); border-color: oklch(0.7 0.16 196 / 0.5); color: var(--accent-cyan); box-shadow: 0 0 12px oklch(0.7 0.16 196 / 0.12); }
+.shape-btn:hover { border-color: var(--accent-purple); color: var(--text-primary); background: var(--bg-elevated); }
+.shape-btn.active { background: var(--accent-purple-bg); border-color: rgba(183, 108, 241, 0.4); color: var(--accent-purple); box-shadow: 0 0 12px rgba(183, 108, 241, 0.12); }
 .shape-preview-svg { flex-shrink: 0; }
 .scale-row { display: flex; align-items: center; gap: 8px; }
 .scale-row .slider { flex: 1; }
 .scale-num { width: 60px; }
 .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: var(--text-muted); cursor: help; vertical-align: middle; margin-left: 3px; transition: color .15s }
-.help-icon:hover { color: var(--accent-cyan) }
+.help-icon:hover { color: var(--accent-purple) }
 .label-wrap { position: relative; }
 .help-tip-banner {
   position: absolute;
   bottom: 100%;
-  left: -30px;                   /* 扩展到 panel-scroll 内容区左边界 */
-  right: -30px;                  /* 扩展到 panel-scroll 内容区右边界 */
-  margin-bottom: 2px;            /* 紧挨 label 上方 */
-  padding: 4px 14px;             /* 左右 padding 与 panel-scroll 一致 */
+  left: -30px;
+  right: -30px;
+  margin-bottom: 2px;
+  padding: 4px 14px;
   background: rgba(15,17,29,0.97);
   border: 1px solid var(--border-color);
   border-radius: 4px;
@@ -175,14 +192,10 @@ function hideTip() { tipText.value = '' }
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
 .hex-input { width: 72px; padding: 4px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
-.hex-input:focus { border-color: var(--accent-cyan); }
+.hex-input:focus { border-color: var(--accent-purple); }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-label { margin-bottom: 0 !important; }
-.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.08); position: relative; cursor: pointer; transition: all 0.2s; }
-.toggle.on { background: var(--accent-cyan); border-color: var(--accent-cyan); }
-.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #555; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: all 0.2s; }
-.toggle.on .toggle-knob { transform: translateX(18px); background: #fff; box-shadow: none; }
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
-.opacity-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-cyan); }
+.opacity-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-purple); }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 </style>

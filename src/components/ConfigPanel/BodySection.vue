@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { rgbaToHex, hexToRgba } from '../../types/config'
+import { rgbaToHex, hexToRgba, isBodyFieldDefault } from '../../types/config'
+import RevertButton from './RevertButton.vue'
 
-const { config, setBodyProp } = useConfig()
+const { config, setBodyProp, resetBodyField } = useConfig()
 
 // 填充颜色 hex 可编辑
 const fHex = ref(rgbaToHex(config.body.fillColor))
@@ -40,14 +41,20 @@ const effectiveColor = computed(() => {
 
     <div class="subsection">
       <div class="toggle-row">
-        <label class="field-label toggle-label">独立设置</label>
+        <div class="label-row">
+          <label class="field-label toggle-label">独立设置</label>
+          <RevertButton :visible="!isBodyFieldDefault(config, 'independentFill')" @revert="resetBodyField('independentFill')" />
+        </div>
         <button :class="['toggle', { on: config.body.independentFill }]" @click="() => { const next = !config.body.independentFill; setBodyProp('independentFill', next); if (!next) { config.body.fillColor = { ...config.cap.color }; setBodyProp('fillOpacity', 255) } }">
           <span class="toggle-knob"></span>
         </button>
       </div>
 
       <div v-if="config.body.independentFill" class="fill-settings fade-in">
-        <label class="field-label">填充颜色</label>
+        <div class="label-row">
+          <label class="field-label">填充颜色</label>
+          <RevertButton :visible="!isBodyFieldDefault(config, 'fillColor')" @revert="resetBodyField('fillColor')" />
+        </div>
         <div class="color-row" style="margin-top:6px">
           <input type="color" :value="rgbaToHex(config.body.fillColor)" class="color-picker" @input="applyFillHex(($event.target as HTMLInputElement).value)" />
           <input v-model="fHex" class="hex-input" maxlength="7" @change="applyFillHex(fHex)" @blur="applyFillHex(fHex)" />
@@ -70,22 +77,19 @@ const effectiveColor = computed(() => {
 </template>
 
 <style scoped>
-.section-icon-svg { color: var(--accent-cyan); flex-shrink: 0; }
+.section-icon-svg { color: var(--accent-purple); flex-shrink: 0; }
 .subsection { margin-bottom: 14px; }
 .subsection:last-child { margin-bottom: 0; }
-.fill-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-cyan); }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.fill-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-purple); }
 .color-row { display: flex; align-items: center; gap: 6px; }
 .color-picker { width: 30px; height: 30px; border: 2px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; background: transparent; padding: 2px; }
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
 .hex-input { width: 72px; padding: 4px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
-.hex-input:focus { border-color: var(--accent-cyan); }
+.hex-input:focus { border-color: var(--accent-purple); }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-label { margin-bottom: 0 !important; }
-.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.08); position: relative; cursor: pointer; transition: all 0.2s; }
-.toggle.on { background: var(--accent-cyan); border-color: var(--accent-cyan); }
-.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #555; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: all 0.2s; }
-.toggle.on .toggle-knob { transform: translateX(18px); background: #fff; box-shadow: none; }
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .sync-hint { margin-top: 8px; padding: 8px 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); }

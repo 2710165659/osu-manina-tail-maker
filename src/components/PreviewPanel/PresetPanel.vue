@@ -229,8 +229,8 @@ onMounted(() => {
 }
 .preset-card:hover {
   background: var(--bg-surface);
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 16px rgba(0, 212, 240, 0.1);
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 16px rgba(183, 108, 241, 0.1);
 }
 
 .preset-thumb {
@@ -259,7 +259,7 @@ onMounted(() => {
   width: 16px;
   height: 16px;
   border: 2px solid transparent;
-  border-top-color: var(--accent-cyan);
+  border-top-color: var(--accent-purple);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
@@ -290,8 +290,8 @@ onMounted(() => {
   font-size: 8px;
   padding: 1px 5px;
   border-radius: 3px;
-  background: var(--accent-cyan-bg);
-  color: var(--accent-cyan);
+  background: var(--accent-purple-bg);
+  color: var(--accent-purple);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex-shrink: 0;
@@ -337,7 +337,7 @@ onMounted(() => {
   font-family: inherit;
   outline: none;
 }
-.save-input:focus { border-color: var(--accent-cyan); }
+.save-input:focus { border-color: var(--accent-purple); }
 .error-text {
   color: #ff4466;
   font-size: 11px;
@@ -362,16 +362,16 @@ onMounted(() => {
 .footer-btn:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
-  border-color: var(--accent-cyan);
+  border-color: var(--accent-purple);
 }
 .footer-btn.primary {
-  background: var(--accent-cyan);
-  border-color: var(--accent-cyan);
-  color: #000;
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  color: #fff;
   font-weight: 600;
 }
 .footer-btn.primary:hover {
-  background: #00e8ff;
+  background: var(--accent-purple-light);
 }
 .footer-btn.ghost {
   background: transparent;

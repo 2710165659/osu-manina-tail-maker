@@ -8,40 +8,41 @@
 
 /* --- CSS Variables --- */
 :root {
-  /* Background layers */
-  --bg-base: #0b0d17;
-  --bg-panel: #0f111d;
-  --bg-elevated: #151827;
-  --bg-surface: #1b1e30;
-  --bg-input: #11131f;
+  /* Background layers (osu Purple scheme) */
+  --bg-base: #1a101f;
+  --bg-panel: #1f1529;
+  --bg-elevated: #271d35;
+  --bg-surface: #332845;
+  --bg-input: #16101e;
 
   /* Border */
-  --border-color: #1e2140;
+  --border-color: #3a2d50;
 
   /* Typography */
-  --text-primary: #e0e2f0;
-  --text-secondary: #9498b8;
-  --text-muted: #5a5e7a;
+  --text-primary: #e0d8f0;
+  --text-secondary: #b8a8d0;
+  --text-muted: #7a6890;
 
-  /* Accent: Electric Cyan */
-  --accent-cyan: #00d4f0;
-  --accent-cyan-bg: oklch(0.7 0.16 196 / 0.08);
+  /* Accent: osu Purple (Hue=255) */
+  --accent-purple: #b76cf1;
+  --accent-purple-bg: rgba(183, 108, 241, 0.08);
+  --accent-purple-light: #d4a0ff;
 
-  /* Accent: Neon Rose (for highlights/alerts) */
-  --accent-rose: #ff2d95;
+  /* Accent: osu Pink (secondary) */
+  --accent-pink: #ff66aa;
 
   /* Semantic */
-  --success: #44ee88;
-  --error: #ff4466;
+  --success: #88b300;
+  --error: #ff6666;
 
   /* Spacing */
   --radius-sm: 4px;
-  --radius-md: 6px;
+  --radius-md: 5px;
   --radius-lg: 8px;
 
   /* Shadows */
-  --shadow-glow-cyan: 0 0 12px oklch(0.7 0.16 196 / 0.12);
-  --shadow-glow-rose: 0 0 8px oklch(0.55 0.18 0 / 0.15);
+  --shadow-glow-purple: 0 0 12px rgba(183, 108, 241, 0.15);
+  --shadow-glow-pink: 0 0 8px rgba(255, 102, 170, 0.12);
 }
 
 /* --- Reset & Base --- */
@@ -77,8 +78,8 @@ body::before {
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+    linear-gradient(rgba(183, 108, 241, 0.01) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(183, 108, 241, 0.01) 1px, transparent 1px);
   background-size: 32px 32px;
   pointer-events: none;
   z-index: 9999;
@@ -102,33 +103,18 @@ body::before {
 
 /* --- Shared Section Styles --- */
 .config-section {
-  background: linear-gradient(135deg, var(--bg-elevated), rgba(21,24,39,0.7));
+  background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   margin-bottom: 0;
-  transition: all 0.25s ease;
+  transition: background 0.3s ease, border-color 0.3s ease;
   position: relative;
   overflow: visible;
 }
-/* Subtle top highlight bar on each card */
-.config-section::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 12px;
-  right: 12px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
-  transition: opacity 0.25s;
-}
 .config-section:hover {
-  border-color: #2a2d4a;
-  background: linear-gradient(135deg, var(--bg-surface), rgba(27,30,48,0.8));
-  box-shadow: 0 0 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,212,240,0.03);
-}
-.config-section:hover::before {
-  background: linear-gradient(90deg, transparent, oklch(0.7 0.16 196 / 0.1), transparent);
+  border-color: #4a3d60;
+  background: var(--bg-surface);
 }
 
 .section-title {
@@ -144,7 +130,7 @@ body::before {
 }
 .section-icon {
   font-size: 14px;
-  color: var(--accent-cyan);
+  color: var(--accent-purple);
 }
 
 /* --- Fields --- */
@@ -178,7 +164,7 @@ body::before {
   margin-top: 3px;
 }
 .field-info strong {
-  color: var(--accent-cyan);
+  color: var(--accent-purple);
   font-family: 'JetBrains Mono', monospace;
 }
 
@@ -197,12 +183,12 @@ body::before {
   font-size: 13px;
   font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .num-input:focus,
 .text-input:focus {
-  border-color: var(--accent-cyan);
-  box-shadow: var(--shadow-glow-cyan);
+  border-color: var(--accent-purple);
+  box-shadow: var(--shadow-glow-purple);
 }
 .num-input {
   text-align: center;
@@ -216,7 +202,7 @@ body::before {
   margin: 0;
 }
 
-/* --- Sliders --- */
+/* --- Sliders (osu RoundedSliderBar style) --- */
 .slider-row {
   display: flex;
   align-items: center;
@@ -227,10 +213,11 @@ body::before {
   -webkit-appearance: none;
   appearance: none;
   height: 5px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
   outline: none;
   cursor: pointer;
+  transition: opacity 0.3s;
 }
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -238,24 +225,30 @@ body::before {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  background: var(--accent-cyan);
+  background: var(--accent-purple);
   border: 2px solid var(--bg-panel);
   cursor: pointer;
-  box-shadow: 0 0 6px oklch(0.7 0.16 196 / 0.5);
-  transition: box-shadow 0.15s;
+  box-shadow: 0 0 6px rgba(183, 108, 241, 0.4);
+  transition: box-shadow 0.3s ease;
+  margin-top: -5px;
 }
 .slider::-webkit-slider-thumb:hover {
-  box-shadow: 0 0 12px oklch(0.7 0.16 196 / 0.7);
+  box-shadow: 0 0 12px rgba(183, 108, 241, 0.6);
+}
+.slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 5px;
+  background: linear-gradient(to right, var(--accent-purple) var(--slider-pct, 0%), rgba(255, 255, 255, 0.2) var(--slider-pct, 0%));
 }
 .slider-val {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: var(--accent-cyan);
+  color: var(--accent-purple);
   min-width: 28px;
   text-align: right;
 }
 
-/* --- Buttons --- */
+/* --- Buttons (osu style) --- */
 .btn {
   padding: 6px 14px;
   border: 1px solid var(--border-color);
@@ -265,29 +258,43 @@ body::before {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   font-family: inherit;
+  position: relative;
+  overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0);
+  transition: background 0.3s ease;
+  pointer-events: none;
+}
+.btn:hover::after {
+  background: rgba(255, 255, 255, 0.08);
 }
 .btn:hover {
-  border-color: var(--accent-cyan);
+  border-color: #4a3d60;
   color: var(--text-primary);
-  background: var(--bg-surface);
 }
 .btn:active {
   transform: scale(0.97);
 }
 .btn-primary {
-  background: var(--accent-cyan);
-  border-color: var(--accent-cyan);
-  color: #0b0d17;
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  color: #fff;
   font-weight: 600;
-  box-shadow: var(--shadow-glow-cyan);
+  box-shadow: var(--shadow-glow-purple);
 }
 .btn-primary:hover {
-  background: oklch(0.72 0.16 196);
-  border-color: oklch(0.72 0.16 196);
-  color: #0b0d17;
-  box-shadow: 0 0 18px oklch(0.7 0.16 196 / 0.25);
+  background: var(--accent-purple-light);
+  border-color: var(--accent-purple-light);
+  color: #fff;
+}
+.btn-primary::after {
+  display: none;
 }
 .btn-primary:disabled {
   opacity: 0.5;
@@ -309,13 +316,13 @@ body::before {
   font-size: 12px;
 }
 .btn-danger {
-  border-color: #3a1a2a;
-  color: #ff6699;
+  border-color: #4a1a30;
+  color: #ff66aa;
 }
 .btn-danger:hover {
-  border-color: var(--error);
-  color: var(--error);
-  background: oklch(0.3 0.06 0 / 0.3);
+  border-color: #cc3378;
+  color: #ff66aa;
+  background: rgba(204, 51, 120, 0.15);
 }
 
 /* --- Color Picker (shared) --- */
@@ -342,7 +349,7 @@ body::before {
   letter-spacing: 0.5px;
 }
 
-/* --- Toggle --- */
+/* --- Toggle (osu Nub style) --- */
 .toggle-row {
   display: flex;
   align-items: center;
@@ -350,30 +357,31 @@ body::before {
 }
 .toggle-label { margin-bottom: 0 !important; }
 .toggle {
-  width: 40px;
-  height: 22px;
-  border-radius: 11px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  width: 50px;
+  height: 15px;
+  border-radius: 15px;
+  background: transparent;
+  border: 3px solid var(--text-muted);
   position: relative;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.toggle:hover {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 8px rgba(183, 108, 241, 0.2);
 }
 .toggle.on {
-  background: var(--accent-cyan);
-  border-color: var(--accent-cyan);
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  border-width: 8.5px;
+  width: 50px;
+  height: 15px;
+  box-shadow: 0 0 12px rgba(183, 108, 241, 0.3);
 }
 .toggle-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.2s;
+  display: none;
 }
-.toggle.on .toggle-knob { transform: translateX(18px); }
 
 /* --- Animations --- */
 .fade-in {
@@ -386,12 +394,37 @@ body::before {
 
 /* --- Focus Ring --- */
 :focus-visible {
-  outline: 2px solid var(--accent-cyan);
+  outline: 2px solid var(--accent-purple);
   outline-offset: 1px;
 }
 
 /* --- Selection --- */
 ::selection {
-  background: oklch(0.7 0.16 196 / 0.2);
-  color: var(--accent-cyan);
+  background: rgba(183, 108, 241, 0.2);
+  color: var(--accent-purple-light);
+}
+
+/* --- Revert to Default Button (osu style) --- */
+.revert-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--bg-surface);
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+.revert-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+.revert-btn svg {
+  width: 10px;
+  height: 10px;
 }

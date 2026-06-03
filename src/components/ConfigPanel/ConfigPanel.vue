@@ -16,12 +16,12 @@ onMounted(() => { loaded.value = true })
         <svg class="logo-svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
           <defs>
             <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28">
-              <stop offset="0%" stop-color="#00d4f0"/>
-              <stop offset="100%" stop-color="#ff2d95"/>
+              <stop offset="0%" stop-color="#b76cf1"/>
+              <stop offset="100%" stop-color="#ff66aa"/>
             </linearGradient>
             <linearGradient id="logoBody" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#00d4f0" stop-opacity="0.6"/>
-              <stop offset="100%" stop-color="#00d4f0" stop-opacity="0.25"/>
+              <stop offset="0%" stop-color="#b76cf1" stop-opacity="0.6"/>
+              <stop offset="100%" stop-color="#b76cf1" stop-opacity="0.25"/>
             </linearGradient>
           </defs>
           <!-- Body rect -->
@@ -34,7 +34,7 @@ onMounted(() => { loaded.value = true })
           <line x1="3" y1="24" x2="25" y2="24" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.25"/>
           <line x1="3" y1="26" x2="25" y2="26" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.4"/>
           <!-- Hit marker -->
-          <circle cx="14" cy="5" r="1.5" fill="#ff2d95" opacity="0.7"/>
+          <circle cx="14" cy="5" r="1.5" fill="#ff66aa" opacity="0.7"/>
         </svg>
         <div class="logo-text-group">
           <span class="logo-title">Tail Maker</span>
@@ -83,11 +83,11 @@ onMounted(() => { loaded.value = true })
   background: linear-gradient(
     180deg,
     transparent 0%,
-    var(--accent-cyan) 15%,
+    var(--accent-purple) 15%,
     transparent 30%,
-    var(--accent-rose) 60%,
+    var(--accent-pink) 60%,
     transparent 80%,
-    var(--accent-cyan) 95%,
+    var(--accent-purple) 95%,
     transparent 100%
   );
   opacity: 0.3;
@@ -98,7 +98,7 @@ onMounted(() => { loaded.value = true })
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
-  background: linear-gradient(180deg, rgba(0,212,240,0.03) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(183, 108, 241, 0.03) 0%, transparent 100%);
 }
 .app-logo {
   display: flex;
@@ -106,8 +106,8 @@ onMounted(() => { loaded.value = true })
   gap: 12px;
 }
 .logo-svg {
-  color: var(--accent-cyan);
-  filter: drop-shadow(0 0 8px oklch(0.7 0.16 196 / 0.5));
+  color: var(--accent-purple);
+  filter: drop-shadow(0 0 8px rgba(183, 108, 241, 0.5));
   flex-shrink: 0;
 }
 .logo-text-group {
@@ -119,7 +119,7 @@ onMounted(() => { loaded.value = true })
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, var(--accent-cyan), #8bf0ff);
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-light));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

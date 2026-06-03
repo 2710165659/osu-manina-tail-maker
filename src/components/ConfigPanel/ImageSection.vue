@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useConfig } from '../../composables/useConfig'
+import { isImageFieldDefault } from '../../types/config'
+import RevertButton from './RevertButton.vue'
 
-const { config, setImageProp } = useConfig()
+const { config, setImageProp, resetImageField } = useConfig()
 const widthWarn = ref('')
 
 const widthModel = computed({
@@ -46,12 +48,15 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
     <div class="field-grid">
       <div class="field">
         <div class="label-wrap">
-          <label class="field-label">
-            宽度 <span class="unit">px</span>
-            <span class="help-icon" @mouseenter="showTip('width', 'lazer必须设置为skin.ini里ColumnWidth值的1.6倍才不会变形。')" @mouseleave="hideTip">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
-            </span>
-          </label>
+          <div class="label-row">
+            <label class="field-label">
+              宽度 <span class="unit">px</span>
+              <span class="help-icon" @mouseenter="showTip('width', 'lazer必须设置为skin.ini里ColumnWidth值的1.6倍才不会变形。')" @mouseleave="hideTip">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+              </span>
+            </label>
+            <RevertButton :visible="!isImageFieldDefault(config, 'width')" @revert="resetImageField('width')" />
+          </div>
           <div v-if="tipKey === 'width'" class="help-tip-banner">{{ tipText }}</div>
         </div>
         <div class="input-wrap">
@@ -67,12 +72,15 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
       </div>
       <div class="field">
         <div class="label-wrap">
-          <label class="field-label">
-            高度 <span class="unit">px</span>
-            <span class="help-icon" @mouseenter="showTip('height', 'lazer推荐32800，否则可能导致尾部变形。stable推荐32767。')" @mouseleave="hideTip">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
-            </span>
-          </label>
+          <div class="label-row">
+            <label class="field-label">
+              高度 <span class="unit">px</span>
+              <span class="help-icon" @mouseenter="showTip('height', 'lazer推荐32800，否则可能导致尾部变形。stable推荐32767。')" @mouseleave="hideTip">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+              </span>
+            </label>
+            <RevertButton :visible="!isImageFieldDefault(config, 'height')" @revert="resetImageField('height')" />
+          </div>
           <div v-if="tipKey === 'height'" class="help-tip-banner">{{ tipText }}</div>
         </div>
         <div class="input-wrap">
@@ -88,12 +96,15 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
     </div>
     <div class="field">
       <div class="label-wrap">
-        <label class="field-label">
-          图片名称
-          <span class="help-icon" @mouseenter="showTip('filename', '因lazer加载问题对于此图片来说2x反而不如1x清晰。')" @mouseleave="hideTip">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
-          </span>
-        </label>
+        <div class="label-row">
+          <label class="field-label">
+            图片名称
+            <span class="help-icon" @mouseenter="showTip('filename', '因lazer加载问题对于此图片来说2x反而不如1x清晰。')" @mouseleave="hideTip">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
+            </span>
+          </label>
+          <RevertButton :visible="!isImageFieldDefault(config, 'filename')" @revert="resetImageField('filename')" />
+        </div>
         <div v-if="tipKey === 'filename'" class="help-tip-banner">{{ tipText }}</div>
       </div>
       <div class="input-wrap input-with-suffix">
@@ -112,7 +123,7 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
 
 <style scoped>
 .section-icon-svg {
-  color: var(--accent-cyan);
+  color: var(--accent-purple);
   flex-shrink: 0;
 }
 .field-grid {
@@ -120,13 +131,19 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
 .input-with-suffix {
   position: relative;
 }
 .input-with-suffix .text-input {
   padding-right: 42px;
 }
-.warn { color: #ff4466; font-size: 11px; margin-top: 4px }
+.warn { color: var(--error); font-size: 11px; margin-top: 4px }
 .input-suffix {
   position: absolute;
   right: 10px;
@@ -140,15 +157,15 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
   padding-left: 4px;
 }
 .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: var(--text-muted); cursor: help; vertical-align: middle; margin-left: 3px; transition: color .15s }
-.help-icon:hover { color: var(--accent-cyan) }
+.help-icon:hover { color: var(--accent-purple) }
 .label-wrap { position: relative; }
 .help-tip-banner {
   position: absolute;
   bottom: 100%;
-  left: -30px;                   /* 扩展到 panel-scroll 内容区左边界 */
-  right: -30px;                  /* 扩展到 panel-scroll 内容区右边界 */
-  margin-bottom: 2px;            /* 紧挨 label 上方 */
-  padding: 4px 14px;             /* 左右 padding 与 panel-scroll 一致 */
+  left: -30px;
+  right: -30px;
+  margin-bottom: 2px;
+  padding: 4px 14px;
   background: rgba(15,17,29,0.97);
   border: 1px solid var(--border-color);
   border-radius: 4px;

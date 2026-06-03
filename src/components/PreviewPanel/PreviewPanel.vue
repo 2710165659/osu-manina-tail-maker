@@ -160,13 +160,13 @@ function drawAnno() {
   // === 左侧竖线 1：投的长度（透明区域）===
   if (config.throwLength > 0 && throwY1 > throwY0 + 4) {
     const x1 = lx
-    ctx.strokeStyle = 'rgba(255,45,149,0.6)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
+    ctx.strokeStyle = 'rgba(255,102,170,0.6)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.moveTo(x1, throwY0); ctx.lineTo(x1, throwY1); ctx.stroke()
     // 端点
-    drawDot(ctx, x1, throwY0, '#ff2d95')
-    drawDot(ctx, x1, throwY1, '#ff2d95')
+    drawDot(ctx, x1, throwY0, '#ff66aa')
+    drawDot(ctx, x1, throwY1, '#ff66aa')
     ctx.textAlign = 'right'
-    vlabel(ctx, `投${config.throwLength}px`, x1 - 6, (throwY0 + throwY1) / 2, '#ff2d95')
+    vlabel(ctx, `投${config.throwLength}px`, x1 - 6, (throwY0 + throwY1) / 2, '#ff66aa')
     ctx.textAlign = 'start'
   }
 
@@ -174,12 +174,12 @@ function drawAnno() {
   const capH = capEndY - throwY1
   if (capH > 4 && capHpx > 0) {
     const x2 = lx + 18
-    ctx.strokeStyle = 'rgba(0,212,240,0.5)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
+    ctx.strokeStyle = 'rgba(183,108,241,0.5)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.moveTo(x2, throwY1); ctx.lineTo(x2, capEndY); ctx.stroke()
-    drawDot(ctx, x2, throwY1, '#00d4f0')
-    drawDot(ctx, x2, capEndY, '#00d4f0')
+    drawDot(ctx, x2, throwY1, '#b76cf1')
+    drawDot(ctx, x2, capEndY, '#b76cf1')
     ctx.textAlign = 'right'
-    vlabel(ctx, `Cap:${Math.round(capHpx)}px`, x2 - 5, (throwY1 + capEndY) / 2, '#00d4f0')
+    vlabel(ctx, `顶端:${Math.round(capHpx)}px`, x2 - 5, (throwY1 + capEndY) / 2, '#b76cf1')
     ctx.textAlign = 'start'
   }
 
@@ -346,8 +346,8 @@ watch([s, cw, ch], paint, { flush: 'post' })
 }
 .topbar-trigger:hover {
   background: var(--bg-elevated);
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
+  border-color: var(--accent-purple);
+  color: var(--accent-purple);
 }
 .reset-trigger {
   display: flex;
@@ -450,11 +450,11 @@ watch([s, cw, ch], paint, { flush: 'post' })
 
 .zoom-row { display:flex; align-items:center; gap:4px }
 .zi { width:52px; padding:3px 4px; text-align:center; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; font-family:'JetBrains Mono',monospace; outline:none }
-.zi:focus { border-color:var(--accent-cyan) }
+.zi:focus { border-color:var(--accent-purple) }
 .zu { font-size:11px; color:var(--text-muted) }
 .st { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted) }
 .dot { width:6px; height:6px; border-radius:50% }
-.dot.ld { background:var(--accent-cyan); animation:pulse 1.2s ease-in-out infinite }
+.dot.ld { background:var(--accent-purple); animation:pulse 1.2s ease-in-out infinite }
 .dot.ok { background:#44ee88 }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 .cv { flex:1; position:relative; overflow:hidden; background:#070810; cursor:grab }
@@ -465,9 +465,9 @@ watch([s, cw, ch], paint, { flush: 'post' })
 .ph svg { opacity:.4 }
 .bg-wrap { position:absolute; top:8px; right:8px; z-index:10; display:flex; gap:4px }
 .bg-btn { padding:5px 10px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.15); border-radius:5px; color:rgba(255,255,255,0.65); font-size:12px; cursor:pointer; font-family:inherit; white-space:nowrap; line-height:1 }
-.bg-btn:hover { background:rgba(0,0,0,0.75); border-color:var(--accent-cyan); color:var(--accent-cyan) }
+.bg-btn:hover { background:rgba(0,0,0,0.75); border-color:var(--accent-purple); color:var(--accent-purple) }
 .bg-drop { position:absolute; top:100%; right:0; margin-top:4px; background:rgba(15,17,29,0.95); border:1px solid var(--border-color); border-radius:5px; overflow:hidden; min-width:100px }
 .bg-opt { display:block; width:100%; padding:6px 14px; background:transparent; border:none; color:var(--text-secondary); font-size:12px; cursor:pointer; text-align:left; font-family:inherit; white-space:nowrap }
 .bg-opt:hover { background:var(--bg-surface); color:var(--text-primary) }
-.bg-opt.on { color:var(--accent-cyan); background:var(--accent-cyan-bg) }
+.bg-opt.on { color:var(--accent-purple); background:var(--accent-purple-bg) }
 </style>

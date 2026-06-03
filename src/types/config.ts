@@ -28,6 +28,33 @@ export function createDefaultConfig(): TailConfig {
   }
 }
 
+const DEFAULT_CONFIG = createDefaultConfig()
+
+/** 判断某个顶层字段是否为默认值 */
+export function isFieldDefault(config: TailConfig, field: keyof TailConfig): boolean {
+  return JSON.stringify(config[field]) === JSON.stringify(DEFAULT_CONFIG[field])
+}
+
+/** 获取某个顶层字段的默认值（深拷贝） */
+export function getDefaultField(field: keyof TailConfig) {
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG[field]))
+}
+
+/** 判断 cap 子字段是否为默认值 */
+export function isCapFieldDefault(config: TailConfig, field: keyof CapConfig): boolean {
+  return JSON.stringify(config.cap[field]) === JSON.stringify(DEFAULT_CONFIG.cap[field])
+}
+
+/** 判断 body 子字段是否为默认值 */
+export function isBodyFieldDefault(config: TailConfig, field: keyof BodyConfig): boolean {
+  return JSON.stringify(config.body[field]) === JSON.stringify(DEFAULT_CONFIG.body[field])
+}
+
+/** 判断 image 子字段是否为默认值 */
+export function isImageFieldDefault(config: TailConfig, field: keyof ImageConfig): boolean {
+  return JSON.stringify(config.image[field]) === JSON.stringify(DEFAULT_CONFIG.image[field])
+}
+
 export function rgbaToHex(c: RgbaColor): string {
   return `#${c.r.toString(16).padStart(2, '0')}${c.g.toString(16).padStart(2, '0')}${c.b.toString(16).padStart(2, '0')}`
 }
