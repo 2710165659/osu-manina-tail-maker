@@ -21,7 +21,7 @@ pub fn draw_cap(
     let cap_opacity = if config.cap.independent_opacity {
         config.cap.opacity
     } else {
-        config.body.fill_opacity
+        255
     };
 
     match config.cap.shape {

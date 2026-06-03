@@ -33,6 +33,7 @@ const opacityModel = computed({
   get: () => config.cap.opacity,
   set: (v: number) => setCapProp('opacity', Math.max(0, Math.min(255, v))),
 })
+const opacityPct = computed(() => Math.round((config.cap.opacity / 255) * 100))
 
 const tipText = ref('')
 function showTip(text: string) { tipText.value = text }
@@ -119,17 +120,17 @@ function hideTip() { tipText.value = '' }
     <div class="field">
       <div class="toggle-row">
         <label class="field-label toggle-label">独立透明度</label>
-        <button :class="['toggle', { on: config.cap.independentOpacity }]" @click="setCapProp('independentOpacity', !config.cap.independentOpacity)">
+        <button :class="['toggle', { on: config.cap.independentOpacity }]" @click="() => { const next = !config.cap.independentOpacity; setCapProp('independentOpacity', next); if (!next) setCapProp('opacity', 255) }">
           <span class="toggle-knob"></span>
         </button>
       </div>
-    </div>
 
-    <div v-if="config.cap.independentOpacity" class="field fade-in">
-      <label class="field-label">顶端透明度 <span class="unit">{{ opacityModel }}</span></label>
-      <div class="slider-row">
-        <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
-        <span class="slider-val">{{ opacityModel }}</span>
+      <div v-if="config.cap.independentOpacity" class="opacity-settings fade-in">
+        <div class="slider-row" style="margin-top:6px">
+          <span class="unit">透明度</span>
+          <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
+          <span class="slider-val">{{ opacityPct }}%</span>
+        </div>
       </div>
     </div>
 
@@ -177,10 +178,11 @@ function hideTip() { tipText.value = '' }
 .hex-input:focus { border-color: var(--accent-cyan); }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-label { margin-bottom: 0 !important; }
-.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--bg-surface); border: 1px solid var(--border-color); position: relative; cursor: pointer; transition: all 0.2s; }
+.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.08); position: relative; cursor: pointer; transition: all 0.2s; }
 .toggle.on { background: var(--accent-cyan); border-color: var(--accent-cyan); }
-.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
-.toggle.on .toggle-knob { transform: translateX(18px); }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #555; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: all 0.2s; }
+.toggle.on .toggle-knob { transform: translateX(18px); background: #fff; box-shadow: none; }
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
+.opacity-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-cyan); }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 </style>

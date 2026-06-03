@@ -46,6 +46,7 @@ pub enum CapShape {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BodyConfig {
+    pub independent_fill: bool,
     pub fill_color: RgbaColor,
     pub fill_opacity: u8,
     pub border_enabled: bool,
@@ -100,6 +101,7 @@ impl TailConfig {
                 opacity: 255,
             },
             body: BodyConfig {
+                independent_fill: false,
                 fill_color: RgbaColor::GREY,
                 fill_opacity: 255,
                 border_enabled: false,

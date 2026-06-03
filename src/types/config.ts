@@ -12,7 +12,7 @@ export const CAP_SHAPE_ORDER: CapShape[] = ['ball', 'diamond', 'rect', 'gradient
 
 export interface ImageConfig { width: number; height: number; filename: string }
 export interface CapConfig { shape: CapShape; scale: number; color: RgbaColor; independentOpacity: boolean; opacity: number }
-export interface BodyConfig { fillColor: RgbaColor; fillOpacity: number; borderEnabled: boolean; borderColor: RgbaColor; borderOpacity: number; borderWidth: number }
+export interface BodyConfig { independentFill: boolean; fillColor: RgbaColor; fillOpacity: number; borderEnabled: boolean; borderColor: RgbaColor; borderOpacity: number; borderWidth: number }
 export interface TailConfig { image: ImageConfig; margin: number; throwLength: number; cap: CapConfig; body: BodyConfig; globalOpacity: number }
 export interface Preset { name: string; config: TailConfig; builtin: boolean }
 export interface ValidationResult { valid: boolean; errors: string[] }
@@ -23,7 +23,7 @@ export function createDefaultConfig(): TailConfig {
     margin: 8,
     throwLength: 100,
     cap: { shape: 'ball', scale: 100, color: { r: 113, g: 113, b: 113, a: 255 }, independentOpacity: false, opacity: 255 },
-    body: { fillColor: { r: 113, g: 113, b: 113, a: 255 }, fillOpacity: 255, borderEnabled: false, borderColor: { r: 255, g: 255, b: 255, a: 255 }, borderOpacity: 255, borderWidth: 1 },
+    body: { independentFill: false, fillColor: { r: 113, g: 113, b: 113, a: 255 }, fillOpacity: 255, borderEnabled: false, borderColor: { r: 255, g: 255, b: 255, a: 255 }, borderOpacity: 255, borderWidth: 1 },
     globalOpacity: 255,
   }
 }

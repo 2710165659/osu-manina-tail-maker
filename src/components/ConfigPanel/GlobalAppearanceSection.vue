@@ -26,6 +26,7 @@ const borderOpacityModel = computed({
   get: () => config.body.borderOpacity,
   set: (v: number) => setBodyProp('borderOpacity', Math.max(0, Math.min(255, v))),
 })
+const borderOpacityPct = computed(() => Math.round((config.body.borderOpacity / 255) * 100))
 const borderWidthModel = computed({
   get: () => config.body.borderWidth,
   set: (v: number) => setBodyProp('borderWidth', Math.max(1, v)),
@@ -75,7 +76,7 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
     <div class="subsection">
       <div class="toggle-row">
         <label class="field-label toggle-label">边框</label>
-        <button :class="['toggle', { on: config.body.borderEnabled }]" @click="setBodyProp('borderEnabled', !config.body.borderEnabled)">
+        <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); if (!next) { config.body.borderColor = { r: 255, g: 255, b: 255, a: 255 }; setBodyProp('borderOpacity', 255); setBodyProp('borderWidth', 1) } }">
           <span class="toggle-knob"></span>
         </button>
       </div>
@@ -88,7 +89,7 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
         <div class="slider-row" style="margin-top:6px">
           <span class="unit">透明度</span>
           <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider" />
-          <span class="slider-val">{{ borderOpacityModel }}</span>
+          <span class="slider-val">{{ borderOpacityPct }}%</span>
         </div>
         <div class="field" style="margin-top:6px">
           <label class="field-label">粗细 <span class="unit">px</span></label>
@@ -149,10 +150,10 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
 .hex-input:focus { border-color: var(--accent-cyan); }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-label { margin-bottom: 0 !important; }
-.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--bg-surface); border: 1px solid var(--border-color); position: relative; cursor: pointer; transition: all 0.2s; }
+.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.08); position: relative; cursor: pointer; transition: all 0.2s; }
 .toggle.on { background: var(--accent-cyan); border-color: var(--accent-cyan); }
-.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
-.toggle.on .toggle-knob { transform: translateX(18px); }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #555; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: all 0.2s; }
+.toggle.on .toggle-knob { transform: translateX(18px); background: #fff; box-shadow: none; }
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .opacity-row {
