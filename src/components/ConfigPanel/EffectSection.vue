@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { rgbaToHex, hexToRgba, isBodyFieldDefault, isEffectFieldDefault } from '../../types/config'
-import RevertButton from './RevertButton.vue'
+import { rgbaToHex, hexToRgba } from '../../types/config'
 
 const { config, setBodyProp, setEffectProp, resetBodyField, resetEffectField } = useConfig()
 
@@ -70,7 +69,6 @@ function toggleEcho() {
       <div class="toggle-row">
         <label class="field-label toggle-label">边框</label>
         <div class="toggle-right">
-          <RevertButton :visible="!isBodyFieldDefault(config, 'borderEnabled')" @revert="resetBodyField('borderEnabled')" />
           <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); resetBodyField('borderColor'); resetBodyField('borderOpacity'); resetBodyField('borderWidth') }">
             <span class="toggle-knob"></span>
           </button>
@@ -80,7 +78,6 @@ function toggleEcho() {
       <div v-if="config.body.borderEnabled" class="sub-settings fade-in">
         <div class="sub-label-row">
           <span class="sub-label">颜色</span>
-          <RevertButton :visible="!isBodyFieldDefault(config, 'borderColor')" @revert="resetBodyField('borderColor')" />
         </div>
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.body.borderColor)" class="color-picker" @input="applyBorderHex(($event.target as HTMLInputElement).value)" />
@@ -89,7 +86,6 @@ function toggleEcho() {
 
         <div class="opacity-label-row">
           <span class="sub-label">透明度</span>
-          <RevertButton :visible="!isBodyFieldDefault(config, 'borderOpacity')" @revert="resetBodyField('borderOpacity')" />
         </div>
         <div class="slider-row">
           <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider" />
@@ -108,7 +104,6 @@ function toggleEcho() {
       <div class="toggle-row">
         <label class="field-label toggle-label">暗化重复</label>
         <div class="toggle-right">
-          <RevertButton :visible="!isEffectFieldDefault(config, 'capEchoEnabled')" @revert="resetEffectField('capEchoEnabled')" />
           <button :class="['toggle', { on: config.effect.capEchoEnabled }]" :disabled="isGradient" @click="toggleEcho">
             <span class="toggle-knob"></span>
           </button>
@@ -118,7 +113,6 @@ function toggleEcho() {
       <div v-if="config.effect.capEchoEnabled" class="sub-settings fade-in">
         <div class="sub-label-row">
           <span class="sub-label">颜色</span>
-          <RevertButton :visible="!isEffectFieldDefault(config, 'echoColor')" @revert="resetEffectField('echoColor')" />
         </div>
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.effect.echoColor)" class="color-picker" @input="applyEchoHex(($event.target as HTMLInputElement).value)" />
@@ -127,7 +121,6 @@ function toggleEcho() {
 
         <div class="opacity-label-row">
           <span class="sub-label">透明度</span>
-          <RevertButton :visible="!isEffectFieldDefault(config, 'echoOpacity')" @revert="resetEffectField('echoOpacity')" />
         </div>
         <div class="slider-row">
           <input v-model.number="echoOpacityModel" type="range" min="0" max="255" class="slider" />
@@ -137,7 +130,6 @@ function toggleEcho() {
         <div class="other-label">长度 <span class="unit">px</span></div>
         <div class="input-wrap" style="margin-top:4px">
           <input v-model.number="echoLengthModel" type="number" :min="0" :max="throwMax" class="num-input" />
-          <RevertButton :visible="!isEffectFieldDefault(config, 'echoLength')" @revert="resetEffectField('echoLength')" />
         </div>
       </div>
     </div>

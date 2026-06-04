@@ -87,9 +87,8 @@ function toggleIndependent() {
     <!-- 独立设置（颜色 + 透明度） -->
     <div class="field">
       <div class="toggle-row">
-        <label class="field-label toggle-label">独立设置</label>
+        <label class="field-label toggle-label">更改顶端颜色和透明度</label>
         <div class="toggle-right">
-          <RevertButton :visible="!isCapFieldDefault(config, 'independentSettings')" @revert="resetCapField('independentSettings')" />
           <button :class="['toggle', { on: config.cap.independentSettings }]" @click="toggleIndependent">
             <span class="toggle-knob"></span>
           </button>
@@ -99,18 +98,18 @@ function toggleIndependent() {
       <div v-if="config.cap.independentSettings" class="sub-settings fade-in">
         <div class="sub-label-row">
           <span class="sub-label">颜色</span>
-          <RevertButton :visible="!isCapFieldDefault(config, 'color')" @revert="resetCapField('color')" />
         </div>
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.cap.color)" class="color-picker" @input="applyCapHex(($event.target as HTMLInputElement).value)" />
           <input v-model="capHex" class="hex-input" maxlength="7" @change="applyCapHex(capHex)" @blur="applyCapHex(capHex)" />
         </div>
 
-        <div class="sub-label-row" style="margin-top:10px"><span class="sub-label">透明度</span></div>
+        <div class="opacity-label-row">
+          <span class="sub-label">透明度</span>
+        </div>
         <div class="slider-row">
           <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
           <span class="slider-val">{{ opacityPct }}%</span>
-          <RevertButton :visible="!isCapFieldDefault(config, 'opacity')" @revert="resetCapField('opacity')" />
         </div>
       </div>
     </div>

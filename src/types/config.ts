@@ -49,17 +49,6 @@ export function isCapFieldDefault(config: TailConfig, field: keyof CapConfig): b
   return JSON.stringify(config.cap[field]) === JSON.stringify(DEFAULT_CONFIG.cap[field])
 }
 
-/** 判断 body 子字段是否为默认值 */
-export function isBodyFieldDefault(config: TailConfig, field: keyof BodyConfig): boolean {
-  return JSON.stringify(config.body[field]) === JSON.stringify(DEFAULT_CONFIG.body[field])
-}
-
-
-/** 判断 effect 子字段是否为默认值 */
-export function isEffectFieldDefault(config: TailConfig, field: keyof EffectConfig): boolean {
-  return JSON.stringify(config.effect[field]) === JSON.stringify(DEFAULT_CONFIG.effect[field])
-}
-
 /** 判断 image 子字段是否为默认值 */
 export function isImageFieldDefault(config: TailConfig, field: keyof ImageConfig): boolean {
   return JSON.stringify(config.image[field]) === JSON.stringify(DEFAULT_CONFIG.image[field])

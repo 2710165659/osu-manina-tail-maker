@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { rgbaToHex, hexToRgba, isBodyFieldDefault } from '../../types/config'
-import RevertButton from './RevertButton.vue'
+import { rgbaToHex, hexToRgba } from '../../types/config'
 
-const { config, setBodyProp, resetBodyField } = useConfig()
+const { config, setBodyProp } = useConfig()
 
 const bodyHex = ref(rgbaToHex(config.body.color))
 watch(() => config.body.color, (c) => { bodyHex.value = rgbaToHex(c) })
@@ -39,9 +38,8 @@ function toggleIndependent() {
 
     <div class="field">
       <div class="toggle-row">
-        <label class="field-label toggle-label">独立设置</label>
+        <label class="field-label toggle-label">更改面身颜色和透明度</label>
         <div class="toggle-right">
-          <RevertButton :visible="!isBodyFieldDefault(config, 'independentSettings')" @revert="resetBodyField('independentSettings')" />
           <button :class="['toggle', { on: config.body.independentSettings }]" @click="toggleIndependent">
             <span class="toggle-knob"></span>
           </button>
@@ -51,18 +49,18 @@ function toggleIndependent() {
       <div v-if="config.body.independentSettings" class="sub-settings fade-in">
         <div class="sub-label-row">
           <span class="sub-label">颜色</span>
-          <RevertButton :visible="!isBodyFieldDefault(config, 'color')" @revert="resetBodyField('color')" />
         </div>
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.body.color)" class="color-picker" @input="applyBodyHex(($event.target as HTMLInputElement).value)" />
           <input v-model="bodyHex" class="hex-input" maxlength="7" @change="applyBodyHex(bodyHex)" @blur="applyBodyHex(bodyHex)" />
         </div>
 
-        <div class="sub-label-row" style="margin-top:10px"><span class="sub-label">透明度</span></div>
+        <div class="opacity-label-row">
+          <span class="sub-label">透明度</span>
+        </div>
         <div class="slider-row">
           <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
           <span class="slider-val">{{ opacityPct }}%</span>
-          <RevertButton :visible="!isBodyFieldDefault(config, 'opacity')" @revert="resetBodyField('opacity')" />
         </div>
       </div>
     </div>
