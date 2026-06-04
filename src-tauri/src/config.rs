@@ -9,6 +9,7 @@ pub struct TailConfig {
     pub throw_length: u32,
     pub cap: CapConfig,
     pub body: BodyConfig,
+    pub effect: EffectConfig,
     pub global_opacity: u8,
 }
 
@@ -53,6 +54,19 @@ pub struct BodyConfig {
     pub border_color: RgbaColor,
     pub border_opacity: u8,
     pub border_width: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EffectConfig {
+    /// 顶端暗化重复开关
+    pub cap_echo_enabled: bool,
+    /// 重复颜色
+    pub echo_color: RgbaColor,
+    /// 重复透明度
+    pub echo_opacity: u8,
+    /// 重复长度
+    pub echo_length: u32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -109,6 +123,12 @@ impl TailConfig {
                 border_opacity: 255,
                 border_width: 1,
             },
+            effect: EffectConfig {
+                cap_echo_enabled: false,
+                echo_color: RgbaColor::GREY,
+                echo_opacity: 76, // 255 * 0.3
+                echo_length: 50,  // throw_length / 2
+            },
             global_opacity: 255,
         }
     }
@@ -133,10 +153,12 @@ impl TailConfig {
             ));
         }
         let cap_h = self.cap_height();
-        if self.throw_length + cap_h >= self.image.height {
+        let echo_enabled = self.effect.cap_echo_enabled && self.cap.shape != CapShape::Gradient;
+        let echo_total_h = if echo_enabled { cap_h + self.effect.echo_length } else { 0 };
+        if self.throw_length + echo_total_h + cap_h >= self.image.height {
             errors.push(format!(
-                "投的长度 ({}) + 顶端高度 ({}) 必须小于图片高度 ({})",
-                self.throw_length, cap_h, self.image.height
+                "投的长度 ({}) + 暗化重复总高度 ({}) + 顶端高度 ({}) 必须小于图片高度 ({})",
+                self.throw_length, echo_total_h, cap_h, self.image.height
             ));
         }
         ValidationResult { valid: errors.is_empty(), errors }
@@ -155,12 +177,8 @@ impl TailConfig {
 
     /// 身体高度
     pub fn body_height(&self) -> u32 {
-        self.image.height.saturating_sub(self.throw_length).saturating_sub(self.cap_height())
+        let echo_enabled = self.effect.cap_echo_enabled && self.cap.shape != CapShape::Gradient;
+        let echo_total_h = if echo_enabled { self.cap_height() + self.effect.echo_length } else { 0 };
+        self.image.height.saturating_sub(self.throw_length).saturating_sub(echo_total_h).saturating_sub(self.cap_height())
     }
-
-    /// Cap 起始 Y
-    pub fn cap_start_y(&self) -> u32 { self.throw_length }
-
-    /// Cap 结束 Y
-    pub fn cap_end_y(&self) -> u32 { self.throw_length + self.cap_height() }
 }

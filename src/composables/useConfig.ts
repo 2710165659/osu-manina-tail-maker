@@ -1,6 +1,6 @@
 import { ref, reactive, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { TailConfig, Preset, CapConfig, BodyConfig, ImageConfig } from '../types/config'
+import type { TailConfig, Preset, CapConfig, BodyConfig, ImageConfig, EffectConfig } from '../types/config'
 import { createDefaultConfig, hexToRgba, rgbaToHex, getDefaultField } from '../types/config'
 
 // 全局单例状态
@@ -129,6 +129,10 @@ export function useConfig() {
     ;(config.body as any)[key] = value
   }
 
+  function setEffectProp<K extends keyof TailConfig['effect']>(key: K, value: TailConfig['effect'][K]) {
+    ;(config.effect as any)[key] = value
+  }
+
   function setCapColorFromHex(hex: string) {
     config.cap.color = hexToRgba(hex, config.cap.color.a)
   }
@@ -157,6 +161,12 @@ export function useConfig() {
     ;(config.body as any)[field] = def[field]
   }
 
+  /** 恢复 effect 子字段为默认值 */
+  function resetEffectField<K extends keyof EffectConfig>(field: K) {
+    const def = getDefaultField('effect') as EffectConfig
+    ;(config.effect as any)[field] = def[field]
+  }
+
   /** 恢复 image 子字段为默认值 */
   function resetImageField<K extends keyof ImageConfig>(field: K) {
     const def = getDefaultField('image') as ImageConfig
@@ -182,6 +192,7 @@ export function useConfig() {
     setImageProp,
     setCapProp,
     setBodyProp,
+    setEffectProp,
     setCapColorFromHex,
     setBodyFillColorFromHex,
     setBodyBorderColorFromHex,
@@ -189,6 +200,7 @@ export function useConfig() {
     resetCapField,
     resetBodyField,
     resetImageField,
+    resetEffectField,
     // helpers
     rgbaToHex,
     hexToRgba,

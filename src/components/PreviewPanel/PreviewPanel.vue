@@ -150,7 +150,15 @@ function drawAnno() {
   const throwY1 = dy + config.throwLength * s.value
   const capDivisor = config.cap.shape === 'gradient' ? 100 : 200
   const capHpx = config.cap.scale * (config.image.width - config.margin * 2) / capDivisor
-  const capEndY = dy + (config.throwLength + capHpx) * s.value
+  const echoEnabled = config.effect.capEchoEnabled && config.cap.shape !== 'gradient'
+  const echoLength = echoEnabled ? config.effect.echoLength : 0
+  const echoCapHpx = echoEnabled ? capHpx : 0
+  const echoTotalHpx = echoEnabled ? capHpx + echoLength : 0
+  const echoStartY = throwY1
+  const echoCapEndY = echoStartY + echoCapHpx * s.value
+  const echoRectEndY = echoCapEndY + echoLength * s.value
+  const capStartY = echoRectEndY
+  const capEndY = capStartY + capHpx * s.value
 
   ctx.font = '10px "JetBrains Mono", monospace'
   ctx.textBaseline = 'middle'
@@ -170,16 +178,28 @@ function drawAnno() {
     ctx.textAlign = 'start'
   }
 
-  // === 左侧竖线 2：Cap 区域（第一个可见像素 → Cap 结束）===
-  const capH = capEndY - throwY1
-  if (capH > 4 && capHpx > 0) {
+  // === 左侧竖线 2：Echo 区域（如果开启）===
+  if (echoEnabled && echoTotalHpx > 0) {
     const x2 = lx + 18
-    ctx.strokeStyle = 'rgba(183,108,241,0.5)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.moveTo(x2, throwY1); ctx.lineTo(x2, capEndY); ctx.stroke()
-    drawDot(ctx, x2, throwY1, '#b76cf1')
-    drawDot(ctx, x2, capEndY, '#b76cf1')
+    ctx.strokeStyle = 'rgba(183,108,241,0.3)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.moveTo(x2, echoStartY); ctx.lineTo(x2, echoRectEndY); ctx.stroke()
+    drawDot(ctx, x2, echoStartY, '#b76cf1')
+    drawDot(ctx, x2, echoRectEndY, '#b76cf1')
     ctx.textAlign = 'right'
-    vlabel(ctx, `顶端:${Math.round(capHpx)}px`, x2 - 5, (throwY1 + capEndY) / 2, '#b76cf1')
+    vlabel(ctx, `暗化重复:${echoTotalHpx}px`, x2 - 6, (echoStartY + echoRectEndY) / 2, '#b76cf1')
+    ctx.textAlign = 'start'
+  }
+
+  // === 左侧竖线 3：Cap 区域（Cap 起始 → Cap 结束）===
+  const capH = capEndY - capStartY
+  if (capH > 4 && capHpx > 0) {
+    const x3 = lx + (echoEnabled ? 36 : 18)
+    ctx.strokeStyle = 'rgba(183,108,241,0.5)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.moveTo(x3, capStartY); ctx.lineTo(x3, capEndY); ctx.stroke()
+    drawDot(ctx, x3, capStartY, '#b76cf1')
+    drawDot(ctx, x3, capEndY, '#b76cf1')
+    ctx.textAlign = 'right'
+    vlabel(ctx, `顶端:${Math.round(capHpx)}px`, x3 - 5, (capStartY + capEndY) / 2, '#b76cf1')
     ctx.textAlign = 'start'
   }
 

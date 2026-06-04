@@ -4,7 +4,7 @@ mod body;
 use cap::draw_cap;
 use body::draw_body;
 
-use crate::config::TailConfig;
+use crate::config::{CapShape, TailConfig};
 use image::{ImageBuffer, Rgba, RgbaImage};
 
 /// 预览最大行数
@@ -19,10 +19,52 @@ pub fn render(config: &TailConfig) -> RgbaImage {
     let cl = config.margin;
     let cr = w.saturating_sub(config.margin);
     let cap_h = config.cap_height();
-    let cap_start = config.cap_start_y();
-    let cap_end = config.cap_end_y();
+    let echo_enabled = config.effect.cap_echo_enabled && config.cap.shape != CapShape::Gradient;
+    let echo_rect_h = if echo_enabled { config.effect.echo_length } else { 0 };
+
+    // 计算各区域位置
+    // echo 关闭时不预留 echo cap 高度，让正常顶端紧跟 throw 之后
+    let echo_cap_h = if echo_enabled { cap_h } else { 0 };
+    let echo_start = config.throw_length;
+    let echo_cap_end = echo_start + echo_cap_h; // 暗化顶端结束位置
+    let echo_rect_end = echo_cap_end + echo_rect_h; // 矩形结束位置
+    let cap_start = echo_rect_end; // 正常顶端开始位置
+    let cap_end = cap_start + cap_h;
     let body_start = cap_end;
     let body_h = config.body_height();
+
+    // echo（顶端暗化重复）—— 图层方式：先画完整 echo 图层，再叠正常内容
+    if echo_enabled && cap_h > 0 {
+        let echo_cap_end = echo_cap_end.min(h);
+        let cr = cr.min(w);
+
+        if echo_start < echo_cap_end && cl < cr {
+            // 1. 创建 echo 图层，绘制完整 echo 区域（cap 形状 + 矩形延伸到正常顶端底部）
+            let mut echo_layer: RgbaImage = ImageBuffer::from_pixel(w, h, Rgba([0, 0, 0, 0]));
+            let echo_config = create_echo_config(config);
+            draw_cap(&mut echo_layer, &echo_config, cl, cr, echo_start, echo_cap_end);
+            // echo 矩形：从 cap 底部延伸到正常顶端底部，覆盖交界处不规则区域
+            let echo_color = config.effect.echo_color;
+            let echo_opacity = config.effect.echo_opacity;
+            let a = (echo_color.a as u16 * echo_opacity as u16 / 255) as u8;
+            let px = Rgba([echo_color.r, echo_color.g, echo_color.b, a]);
+            let fill_end = cap_end.min(h);
+            for y in echo_cap_end..fill_end {
+                for x in cl..cr {
+                    echo_layer.put_pixel(x, y, px);
+                }
+            }
+            // 2. 合并到主图片：只在主图片透明处绘制 echo 像素
+            for y in echo_start..fill_end {
+                for x in cl..cr {
+                    let ep = echo_layer.get_pixel(x, y);
+                    if ep[3] > 0 && img.get_pixel(x, y)[3] == 0 {
+                        img.put_pixel(x, y, *ep);
+                    }
+                }
+            }
+        }
+    }
 
     // cap
     if cap_h > 0 {
@@ -45,6 +87,25 @@ pub fn render(config: &TailConfig) -> RgbaImage {
         }
     }
     img
+}
+
+/// 创建 echo 效果的配置（使用 echo 的颜色和透明度）
+fn create_echo_config(config: &TailConfig) -> TailConfig {
+    let mut echo_config = config.clone();
+    echo_config.cap.color = config.effect.echo_color;
+    echo_config.cap.independent_opacity = true;
+    echo_config.cap.opacity = config.effect.echo_opacity;
+    // echo 的 scale 需要按比例缩放，使其高度等于 echo_length
+    let cap_h = config.cap_height();
+    if cap_h > 0 {
+        let scale_factor = config.effect.echo_length as f64 / cap_h as f64;
+        echo_config.cap.scale = (config.cap.scale as f64 * scale_factor) as u32;
+        // 确保 scale 至少为 1
+        if echo_config.cap.scale == 0 {
+            echo_config.cap.scale = 1;
+        }
+    }
+    echo_config
 }
 
 /// 在内容区边缘画边框，边框沿 cap 形状内蚀，挤占 body

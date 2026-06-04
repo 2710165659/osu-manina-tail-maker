@@ -4,6 +4,7 @@ import ImageSection from './ImageSection.vue'
 import GlobalAppearanceSection from './GlobalAppearanceSection.vue'
 import CapSection from './CapSection.vue'
 import BodySection from './BodySection.vue'
+import EffectSection from './EffectSection.vue'
 
 const loaded = ref(false)
 onMounted(() => { loaded.value = true })
@@ -54,6 +55,9 @@ onMounted(() => { loaded.value = true })
       </div>
       <div :class="['section-wrapper', { visible: loaded }]" style="--i:3">
         <BodySection />
+      </div>
+      <div :class="['section-wrapper', { visible: loaded }]" style="--i:4">
+        <EffectSection />
       </div>
     </div>
   </aside>

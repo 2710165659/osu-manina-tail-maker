@@ -1,4 +1,4 @@
-use crate::config::{BodyConfig, CapConfig, CapShape, ImageConfig, Preset, RgbaColor, TailConfig};
+use crate::config::{BodyConfig, CapConfig, CapShape, EffectConfig, ImageConfig, Preset, RgbaColor, TailConfig};
 
 pub fn builtin_presets() -> Vec<Preset> {
     vec![
@@ -9,6 +9,7 @@ pub fn builtin_presets() -> Vec<Preset> {
                 margin: 0, throw_length: 100,
                 cap: CapConfig { shape: CapShape::Ball, scale: 100, color: RgbaColor::WHITE, independent_opacity: false, opacity: 255 },
                 body: BodyConfig { independent_fill: false, fill_color: RgbaColor::WHITE, fill_opacity: 200, border_enabled: true, border_color: RgbaColor::WHITE, border_opacity: 180, border_width: 1 },
+                effect: EffectConfig { cap_echo_enabled: false, echo_color: RgbaColor::WHITE, echo_opacity: 76, echo_length: 50 },
                 global_opacity: 255,
             },
         },
@@ -19,6 +20,7 @@ pub fn builtin_presets() -> Vec<Preset> {
                 margin: 0, throw_length: 100,
                 cap: CapConfig { shape: CapShape::Diamond, scale: 120, color: RgbaColor { r: 255, g: 107, b: 157, a: 255 }, independent_opacity: false, opacity: 255 },
                 body: BodyConfig { independent_fill: false, fill_color: RgbaColor { r: 255, g: 107, b: 157, a: 255 }, fill_opacity: 220, border_enabled: false, border_color: RgbaColor::BLACK, border_opacity: 255, border_width: 1 },
+                effect: EffectConfig { cap_echo_enabled: false, echo_color: RgbaColor { r: 255, g: 107, b: 157, a: 255 }, echo_opacity: 76, echo_length: 50 },
                 global_opacity: 255,
             },
         },
@@ -29,6 +31,7 @@ pub fn builtin_presets() -> Vec<Preset> {
                 margin: 0, throw_length: 100,
                 cap: CapConfig { shape: CapShape::Gradient, scale: 150, color: RgbaColor { r: 100, g: 200, b: 255, a: 255 }, independent_opacity: false, opacity: 255 },
                 body: BodyConfig { independent_fill: false, fill_color: RgbaColor { r: 100, g: 200, b: 255, a: 255 }, fill_opacity: 200, border_enabled: false, border_color: RgbaColor::BLACK, border_opacity: 255, border_width: 1 },
+                effect: EffectConfig { cap_echo_enabled: false, echo_color: RgbaColor { r: 100, g: 200, b: 255, a: 255 }, echo_opacity: 76, echo_length: 50 },
                 global_opacity: 255,
             },
         },
@@ -39,6 +42,7 @@ pub fn builtin_presets() -> Vec<Preset> {
                 margin: 0, throw_length: 100,
                 cap: CapConfig { shape: CapShape::Rect, scale: 0, color: RgbaColor::WHITE, independent_opacity: false, opacity: 255 },
                 body: BodyConfig { independent_fill: false, fill_color: RgbaColor::WHITE, fill_opacity: 255, border_enabled: false, border_color: RgbaColor::BLACK, border_opacity: 255, border_width: 1 },
+                effect: EffectConfig { cap_echo_enabled: false, echo_color: RgbaColor::WHITE, echo_opacity: 76, echo_length: 50 },
                 global_opacity: 255,
             },
         },
@@ -49,6 +53,7 @@ pub fn builtin_presets() -> Vec<Preset> {
                 margin: 0, throw_length: 100,
                 cap: CapConfig { shape: CapShape::Rect, scale: 0, color: RgbaColor::WHITE, independent_opacity: false, opacity: 255 },
                 body: BodyConfig { independent_fill: false, fill_color: RgbaColor::WHITE, fill_opacity: 180, border_enabled: true, border_color: RgbaColor::WHITE, border_opacity: 255, border_width: 2 },
+                effect: EffectConfig { cap_echo_enabled: false, echo_color: RgbaColor::WHITE, echo_opacity: 76, echo_length: 50 },
                 global_opacity: 255,
             },
         },

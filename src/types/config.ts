@@ -13,7 +13,8 @@ export const CAP_SHAPE_ORDER: CapShape[] = ['ball', 'diamond', 'rect', 'gradient
 export interface ImageConfig { width: number; height: number; filename: string }
 export interface CapConfig { shape: CapShape; scale: number; color: RgbaColor; independentOpacity: boolean; opacity: number }
 export interface BodyConfig { independentFill: boolean; fillColor: RgbaColor; fillOpacity: number; borderEnabled: boolean; borderColor: RgbaColor; borderOpacity: number; borderWidth: number }
-export interface TailConfig { image: ImageConfig; margin: number; throwLength: number; cap: CapConfig; body: BodyConfig; globalOpacity: number }
+export interface EffectConfig { capEchoEnabled: boolean; echoColor: RgbaColor; echoOpacity: number; echoLength: number }
+export interface TailConfig { image: ImageConfig; margin: number; throwLength: number; cap: CapConfig; body: BodyConfig; effect: EffectConfig; globalOpacity: number }
 export interface Preset { name: string; config: TailConfig; builtin: boolean }
 export interface ValidationResult { valid: boolean; errors: string[] }
 
@@ -24,6 +25,7 @@ export function createDefaultConfig(): TailConfig {
     throwLength: 100,
     cap: { shape: 'ball', scale: 100, color: { r: 113, g: 113, b: 113, a: 255 }, independentOpacity: false, opacity: 255 },
     body: { independentFill: false, fillColor: { r: 113, g: 113, b: 113, a: 255 }, fillOpacity: 255, borderEnabled: false, borderColor: { r: 255, g: 255, b: 255, a: 255 }, borderOpacity: 255, borderWidth: 1 },
+    effect: { capEchoEnabled: false, echoColor: { r: 113, g: 113, b: 113, a: 255 }, echoOpacity: 76, echoLength: 50 },
     globalOpacity: 255,
   }
 }
@@ -48,6 +50,11 @@ export function isCapFieldDefault(config: TailConfig, field: keyof CapConfig): b
 /** 判断 body 子字段是否为默认值 */
 export function isBodyFieldDefault(config: TailConfig, field: keyof BodyConfig): boolean {
   return JSON.stringify(config.body[field]) === JSON.stringify(DEFAULT_CONFIG.body[field])
+}
+
+/** 判断 effect 子字段是否为默认值 */
+export function isEffectFieldDefault(config: TailConfig, field: keyof EffectConfig): boolean {
+  return JSON.stringify(config.effect[field]) === JSON.stringify(DEFAULT_CONFIG.effect[field])
 }
 
 /** 判断 image 子字段是否为默认值 */

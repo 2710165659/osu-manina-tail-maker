@@ -11,7 +11,13 @@ pub fn draw_body(
     y_start: u32,
     body_height: u32,
 ) {
-    let y_end = y_start + body_height;
+    let h = img.height();
+    let w = img.width();
+    let y_end = (y_start + body_height).min(h);
+    let right = right.min(w);
+    if y_start >= h || left >= right {
+        return;
+    }
     let (fc, fo) = if config.body.independent_fill {
         (config.body.fill_color, config.body.fill_opacity)
     } else {

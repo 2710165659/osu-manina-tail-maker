@@ -14,6 +14,15 @@ pub fn draw_cap(
     y_start: u32,
     y_end: u32,
 ) {
+    let h = img.height();
+    let w = img.width();
+    let y_start = y_start.min(h);
+    let y_end = y_end.min(h);
+    let left = left.min(w);
+    let right = right.min(w);
+    if y_start >= y_end || left >= right {
+        return;
+    }
     let content_w = right - left;
     let cap_h = y_end - y_start;
 
@@ -34,11 +43,11 @@ pub fn draw_cap(
             }
         }
         CapShape::Ball => {
-            // 上半椭圆：圆心在 Cap 底部中心
+            // 上半椭圆：圆心在 Cap 最后一行中心，确保底部达到全宽
             let cx = (left + right) as f64 / 2.0;
-            let cy = y_end as f64; // 圆心在 Cap 区域下方边界
+            let cy = y_end.saturating_sub(1) as f64; // 圆心在最后一行，确保绘制范围底边全宽
             let rx = content_w as f64 / 2.0;
-            let ry = cap_h as f64;
+            let ry = cap_h.saturating_sub(1).max(1) as f64;
 
             for y in y_start..y_end {
                 for x in left..right {
@@ -53,8 +62,9 @@ pub fn draw_cap(
         CapShape::Diamond => {
             // 上半菱形：顶点在 Cap 起始线中心，底部宽度 = 内容区宽度
             let cx = (left + right) as f64 / 2.0;
+            let div = cap_h.saturating_sub(1).max(1) as f64; // 确保最后一行 t=1.0，底部全宽
             for y in y_start..y_end {
-                let t = (y - y_start) as f64 / cap_h as f64; // 0(顶) → 1(底)
+                let t = (y - y_start) as f64 / div; // 0(顶) → 1(底)
                 let half_w = (content_w as f64 / 2.0) * t; // 从 0 扩展到 content_w/2
                 let left_bound = cx - half_w;
                 let right_bound = cx + half_w;
@@ -73,8 +83,9 @@ pub fn draw_cap(
         }
         CapShape::Gradient => {
             // 矩形 + 透明度渐变：从上到下透明度递增
+            let div = cap_h.saturating_sub(1).max(1) as f64;
             for y in y_start..y_end {
-                let t = (y - y_start) as f64 / cap_h as f64; // 0(顶,全透明) → 1(底,目标透明度)
+                let t = (y - y_start) as f64 / div; // 0(顶,全透明) → 1(底,目标透明度)
                 let row_alpha = (t * cap_opacity as f64).round() as u8;
 
                 for x in left..right {
