@@ -39,7 +39,7 @@ onMounted(() => { loaded.value = true })
         </svg>
         <div class="logo-text-group">
           <span class="logo-title">Tail Maker</span>
-          <span class="logo-subtitle">osu!mania 投皮生成器</span>
+          <span class="logo-subtitle">osu!mania 面皮生成器</span>
         </div>
       </div>
     </div>

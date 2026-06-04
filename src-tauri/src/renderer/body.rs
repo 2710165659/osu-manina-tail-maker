@@ -18,10 +18,10 @@ pub fn draw_body(
     if y_start >= h || left >= right {
         return;
     }
-    let (fc, fo) = if config.body.independent_fill {
-        (config.body.fill_color, config.body.fill_opacity)
+    let (fc, fo) = if config.body.independent_settings {
+        (config.body.color, config.body.opacity)
     } else {
-        (config.cap.color, 255)
+        (config.global_color, config.global_opacity)
     };
     let a = (fc.a as u16 * fo as u16 / 255) as u8;
     let px = Rgba([fc.r, fc.g, fc.b, a]);

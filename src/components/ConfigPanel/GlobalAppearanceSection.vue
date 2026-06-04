@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { rgbaToHex, hexToRgba, isFieldDefault, isBodyFieldDefault } from '../../types/config'
+import { isFieldDefault, rgbaToHex, hexToRgba } from '../../types/config'
 import RevertButton from './RevertButton.vue'
 
-const { config, setBodyProp, resetField, resetBodyField } = useConfig()
+const { config, resetField } = useConfig()
 
-// ── 留白 ──
 const marginMax = computed(() => Math.floor((config.image.width - 1) / 2))
 const contentWidth = computed(() => config.image.width - config.margin * 2)
 const marginModel = computed({
@@ -14,31 +13,24 @@ const marginModel = computed({
   set: (v: number) => (config.margin = Math.max(0, Math.min(marginMax.value, v))),
 })
 
-// ── 边框 ──
-const bHex = ref(rgbaToHex(config.body.borderColor))
-watch(() => config.body.borderColor, (c) => { bHex.value = rgbaToHex(c) })
-function applyBorderHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) {
-    config.body.borderColor = hexToRgba('#' + clean, config.body.borderColor.a)
-  }
-}
-const borderOpacityModel = computed({
-  get: () => config.body.borderOpacity,
-  set: (v: number) => setBodyProp('borderOpacity', Math.max(0, Math.min(255, v))),
-})
-const borderOpacityPct = computed(() => Math.round((config.body.borderOpacity / 255) * 100))
-const borderWidthModel = computed({
-  get: () => config.body.borderWidth,
-  set: (v: number) => setBodyProp('borderWidth', Math.max(1, v)),
+const throwMax = computed(() => Math.max(0, config.image.height - 1))
+const throwModel = computed({
+  get: () => config.throwLength,
+  set: (v: number) => (config.throwLength = Math.max(0, Math.min(throwMax.value, v))),
 })
 
-// ── 整体透明度 ──
+const colorHex = ref(rgbaToHex(config.globalColor))
+watch(() => config.globalColor, (c) => { colorHex.value = rgbaToHex(c) })
+function applyHex(v: string) {
+  const clean = v.replace('#', '').trim()
+  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.globalColor = hexToRgba('#' + clean)
+}
+
 const opacityModel = computed({
   get: () => config.globalOpacity,
   set: (v: number) => (config.globalOpacity = Math.max(0, Math.min(255, v))),
 })
-const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
+const opacityPct = computed(() => Math.round((config.globalOpacity / 255) * 100))
 </script>
 
 <template>
@@ -53,137 +45,60 @@ const pct = computed(() => Math.round((config.globalOpacity / 255) * 100))
       整体外观
     </h3>
 
-    <!-- 留白 -->
-    <div class="subsection">
+    <div class="field">
       <div class="label-row">
-        <label class="field-label">
-          留白 <span class="unit">px</span>
-          <span class="field-hint">（左右对称）</span>
-        </label>
+        <label class="field-label">留白 <span class="unit">px</span> <span class="field-hint">（左右对称）</span></label>
         <RevertButton :visible="!isFieldDefault(config, 'margin')" @revert="resetField('margin')" />
       </div>
       <div class="input-wrap">
-        <input
-          v-model.number="marginModel"
-          type="number"
-          :min="0"
-          :max="marginMax"
-          class="num-input"
-        />
+        <input v-model.number="marginModel" type="number" :min="0" :max="marginMax" class="num-input" />
       </div>
-      <div class="field-info">
-        内容区宽度: <strong>{{ contentWidth }}px</strong>
-      </div>
+      <div class="field-info">内容区宽度: <strong>{{ contentWidth }}px</strong></div>
     </div>
 
-    <!-- 边框 -->
-    <div class="subsection">
-      <div class="toggle-row">
-        <div class="label-row">
-          <label class="field-label toggle-label">边框</label>
-          <RevertButton :visible="!isBodyFieldDefault(config, 'borderEnabled')" @revert="resetBodyField('borderEnabled')" />
-        </div>
-        <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); if (!next) { config.body.borderColor = { r: 255, g: 255, b: 255, a: 255 }; setBodyProp('borderOpacity', 255); setBodyProp('borderWidth', 1) } }">
-          <span class="toggle-knob"></span>
-        </button>
-      </div>
-
-      <div v-if="config.body.borderEnabled" class="border-settings fade-in">
-        <div class="color-row" style="margin-top:6px">
-          <input type="color" :value="rgbaToHex(config.body.borderColor)" class="color-picker" @input="applyBorderHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="bHex" class="hex-input" maxlength="7" @change="applyBorderHex(bHex)" @blur="applyBorderHex(bHex)" />
-        </div>
-        <div class="slider-row" style="margin-top:6px">
-          <span class="unit">透明度</span>
-          <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider" />
-          <span class="slider-val">{{ borderOpacityPct }}%</span>
-        </div>
-        <div class="field" style="margin-top:6px">
-          <label class="field-label">粗细 <span class="unit">px</span></label>
-          <div class="input-wrap">
-            <input v-model.number="borderWidthModel" type="number" min="1" class="num-input narrow" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 整体透明度 -->
-    <div class="subsection">
+    <div class="field">
       <div class="label-row">
-        <label class="field-label">整体透明度</label>
+        <label class="field-label">投的长度 <span class="unit">px</span></label>
+        <RevertButton :visible="!isFieldDefault(config, 'throwLength')" @revert="resetField('throwLength')" />
+      </div>
+      <div class="input-wrap">
+        <input v-model.number="throwModel" type="number" :min="0" :max="throwMax" class="num-input" />
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="label-row">
+        <label class="field-label">颜色</label>
+        <RevertButton :visible="!isFieldDefault(config, 'globalColor')" @revert="resetField('globalColor')" />
+      </div>
+      <div class="color-row">
+        <input type="color" :value="rgbaToHex(config.globalColor)" class="color-picker" @input="applyHex(($event.target as HTMLInputElement).value)" />
+        <input v-model="colorHex" class="hex-input" maxlength="7" @change="applyHex(colorHex)" @blur="applyHex(colorHex)" />
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="label-row">
+        <label class="field-label">透明度</label>
         <RevertButton :visible="!isFieldDefault(config, 'globalOpacity')" @revert="resetField('globalOpacity')" />
       </div>
-      <div class="opacity-row">
-        <input
-          v-model.number="opacityModel"
-          type="range"
-          min="0"
-          max="255"
-          class="slider"
-        />
-        <div class="opacity-value">
-          <span class="opacity-pct">{{ pct }}%</span>
-        </div>
-      </div>
-      <div class="field-info">
-        作用于所有非透明区域，与各区域透明度相乘
+      <div class="slider-row">
+        <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
+        <span class="slider-val">{{ opacityPct }}%</span>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.section-icon-svg {
-  color: var(--accent-purple);
-  flex-shrink: 0;
-}
-.subsection {
-  margin-bottom: 14px;
-}
-.subsection:last-child {
-  margin-bottom: 0;
-}
-.label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.border-settings {
-  margin-top: 8px;
-  padding: 10px;
-  background: var(--bg-input);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  border-left: 2px solid var(--accent-purple);
-}
-.narrow { max-width: 80px; }
+.section-icon-svg { color: var(--accent-purple); flex-shrink: 0; }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.slider-row { display: flex; align-items: center; gap: 8px; }
+.slider { flex: 1; }
 .color-row { display: flex; align-items: center; gap: 6px; }
 .color-picker { width: 30px; height: 30px; border: 2px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; background: transparent; padding: 2px; }
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
 .hex-input { width: 72px; padding: 4px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
 .hex-input:focus { border-color: var(--accent-purple); }
-.toggle-row { display: flex; align-items: center; justify-content: space-between; }
-.toggle-label { margin-bottom: 0 !important; }
-.fade-in { animation: fadeSlideIn 0.25s ease-out; }
-@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-.opacity-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.slider { flex: 1; }
-.opacity-value {
-  display: flex;
-  align-items: baseline;
-  gap: 2px;
-  min-width: 56px;
-  justify-content: flex-end;
-}
-.opacity-pct {
-  font-size: 10px;
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-}
 </style>

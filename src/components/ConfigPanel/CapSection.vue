@@ -1,17 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, isFieldDefault, isCapFieldDefault } from '../../types/config'
+import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, isCapFieldDefault } from '../../types/config'
 import RevertButton from './RevertButton.vue'
 
-const { config, setCapProp, resetField, resetCapField } = useConfig()
+const { config, setCapProp, resetCapField } = useConfig()
 const shapes = CAP_SHAPE_ORDER
 
-const throwMax = computed(() => Math.max(0, config.image.height - 1))
-const throwModel = computed({
-  get: () => config.throwLength,
-  set: (v: number) => (config.throwLength = Math.max(0, Math.min(throwMax.value, v))),
-})
 const capScaleModel = ref(config.cap.scale)
 const capScaleFree = ref(false)
 watch(() => config.cap.scale, (v) => { if (!capScaleFree.value) capScaleModel.value = v })
@@ -20,14 +15,11 @@ function applyScale(v: number) {
   setCapProp('scale', Math.max(1, v))
 }
 
-// 颜色 hex 可编辑
 const capHex = ref(rgbaToHex(config.cap.color))
 watch(() => config.cap.color, (c) => { capHex.value = rgbaToHex(c) })
 function applyCapHex(v: string) {
   const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) {
-    config.cap.color = hexToRgba('#' + clean, config.cap.color.a)
-  }
+  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.cap.color = hexToRgba('#' + clean, config.cap.color.a)
 }
 
 const opacityModel = computed({
@@ -36,30 +28,23 @@ const opacityModel = computed({
 })
 const opacityPct = computed(() => Math.round((config.cap.opacity / 255) * 100))
 
-const tipText = ref('')
-function showTip(text: string) { tipText.value = text }
-function hideTip() { tipText.value = '' }
+function toggleIndependent() {
+  const next = !config.cap.independentSettings
+  setCapProp('independentSettings', next)
+  config.cap.color = { ...config.globalColor }
+  config.cap.opacity = config.globalOpacity
+}
 </script>
 
 <template>
-  <section class="config-section cap-section">
+  <section class="config-section">
     <h3 class="section-title">
       <svg width="14" height="14" viewBox="0 0 14 14" class="section-icon-svg">
         <polygon points="7,1 13,7 7,13 1,7" fill="none" stroke="currentColor" stroke-width="1.2"/>
         <circle cx="7" cy="5" r="1" fill="currentColor"/>
       </svg>
-      投皮头
+      顶端
     </h3>
-
-    <div class="field">
-      <div class="label-row">
-        <label class="field-label">投的长度 <span class="unit">px</span></label>
-        <RevertButton :visible="!isFieldDefault(config, 'throwLength')" @revert="resetField('throwLength')" />
-      </div>
-      <div class="input-wrap">
-        <input v-model.number="throwModel" type="number" :min="0" :max="throwMax" class="num-input" />
-      </div>
-    </div>
 
     <div class="field">
       <div class="label-row">
@@ -89,113 +74,80 @@ function hideTip() { tipText.value = '' }
     </div>
 
     <div class="field">
-      <div class="label-wrap">
-        <div class="label-row">
-          <label class="field-label">
-            顶端缩放
-            <span class="help-icon" @mouseenter="showTip('值越小圆越扁')" @mouseleave="hideTip">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
-            </span>
-          </label>
-          <RevertButton :visible="!isCapFieldDefault(config, 'scale')" @revert="resetCapField('scale')" />
-        </div>
-        <div v-if="tipText" class="help-tip-banner">{{ tipText }}</div>
+      <div class="label-row">
+        <label class="field-label">顶端缩放</label>
+        <RevertButton :visible="!isCapFieldDefault(config, 'scale')" @revert="resetCapField('scale')" />
       </div>
       <div class="scale-row">
         <input v-model.number="capScaleModel" type="range" min="1" max="500" class="slider" @input="applyScale(capScaleModel)" />
-        <input
-          v-model.number="capScaleModel"
-          type="number"
-          :min="1"
-          class="num-input scale-num"
-          @change="applyScale(capScaleModel)"
-        />
+        <input v-model.number="capScaleModel" type="number" :min="1" class="num-input scale-num" @change="applyScale(capScaleModel)" />
       </div>
     </div>
 
-    <div class="field">
-      <div class="label-row">
-        <label class="field-label">顶端颜色</label>
-        <RevertButton :visible="!isCapFieldDefault(config, 'color')" @revert="resetCapField('color')" />
-      </div>
-      <div class="color-row">
-        <input type="color" :value="rgbaToHex(config.cap.color)" class="color-picker" @input="applyCapHex(($event.target as HTMLInputElement).value)" />
-        <input
-          v-model="capHex"
-          class="hex-input"
-          maxlength="7"
-          @change="applyCapHex(capHex)"
-          @blur="applyCapHex(capHex)"
-        />
-      </div>
-    </div>
-
+    <!-- 独立设置（颜色 + 透明度） -->
     <div class="field">
       <div class="toggle-row">
-        <div class="label-row">
-          <label class="field-label toggle-label">独立透明度</label>
-          <RevertButton :visible="!isCapFieldDefault(config, 'independentOpacity')" @revert="resetCapField('independentOpacity')" />
+        <label class="field-label toggle-label">独立设置</label>
+        <div class="toggle-right">
+          <RevertButton :visible="!isCapFieldDefault(config, 'independentSettings')" @revert="resetCapField('independentSettings')" />
+          <button :class="['toggle', { on: config.cap.independentSettings }]" @click="toggleIndependent">
+            <span class="toggle-knob"></span>
+          </button>
         </div>
-        <button :class="['toggle', { on: config.cap.independentOpacity }]" @click="() => { const next = !config.cap.independentOpacity; setCapProp('independentOpacity', next); if (!next) setCapProp('opacity', 255) }">
-          <span class="toggle-knob"></span>
-        </button>
       </div>
 
-      <div v-if="config.cap.independentOpacity" class="opacity-settings fade-in">
-        <div class="slider-row" style="margin-top:6px">
-          <span class="unit">透明度</span>
+      <div v-if="config.cap.independentSettings" class="sub-settings fade-in">
+        <div class="sub-label-row">
+          <span class="sub-label">颜色</span>
+          <RevertButton :visible="!isCapFieldDefault(config, 'color')" @revert="resetCapField('color')" />
+        </div>
+        <div class="color-row">
+          <input type="color" :value="rgbaToHex(config.cap.color)" class="color-picker" @input="applyCapHex(($event.target as HTMLInputElement).value)" />
+          <input v-model="capHex" class="hex-input" maxlength="7" @change="applyCapHex(capHex)" @blur="applyCapHex(capHex)" />
+        </div>
+
+        <div class="sub-label-row" style="margin-top:10px"><span class="sub-label">透明度</span></div>
+        <div class="slider-row">
           <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
           <span class="slider-val">{{ opacityPct }}%</span>
+          <RevertButton :visible="!isCapFieldDefault(config, 'opacity')" @revert="resetCapField('opacity')" />
         </div>
       </div>
     </div>
-
   </section>
 </template>
 
 <style scoped>
 .section-icon-svg { color: var(--accent-purple); flex-shrink: 0; }
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; }
+.toggle-label { margin-bottom: 0 !important; }
+.toggle-right { display: flex; align-items: center; gap: 6px; }
 .shape-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .shape-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; font-size: 12px; }
 .shape-btn:hover { border-color: var(--accent-purple); color: var(--text-primary); background: var(--bg-elevated); }
-.shape-btn.active { background: var(--accent-purple-bg); border-color: rgba(183, 108, 241, 0.4); color: var(--accent-purple); box-shadow: 0 0 12px rgba(183, 108, 241, 0.12); }
+.shape-btn.active { background: var(--accent-purple-bg); border-color: rgba(183,108,241,0.4); color: var(--accent-purple); box-shadow: 0 0 12px rgba(183,108,241,0.12); }
 .shape-preview-svg { flex-shrink: 0; }
 .scale-row { display: flex; align-items: center; gap: 8px; }
 .scale-row .slider { flex: 1; }
 .scale-num { width: 60px; }
-.help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: var(--text-muted); cursor: help; vertical-align: middle; margin-left: 3px; transition: color .15s }
-.help-icon:hover { color: var(--accent-purple) }
-.label-wrap { position: relative; }
-.help-tip-banner {
-  position: absolute;
-  bottom: 100%;
-  left: -30px;
-  right: -30px;
-  margin-bottom: 2px;
-  padding: 4px 14px;
-  background: rgba(15,17,29,0.97);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 11px;
-  line-height: 1.55;
-  color: var(--text-primary);
-  text-align: left;
-  white-space: normal;
-  word-break: break-all;
-  z-index: 100;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-  pointer-events: none;
-}
+.sub-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-purple); }
+.sub-label-row, .opacity-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.opacity-label-row { margin-top: 10px; }
+.sub-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
 .color-row { display: flex; align-items: center; gap: 6px; }
 .color-picker { width: 30px; height: 30px; border: 2px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; background: transparent; padding: 2px; }
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
 .hex-input { width: 72px; padding: 4px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
 .hex-input:focus { border-color: var(--accent-purple); }
-.toggle-row { display: flex; align-items: center; justify-content: space-between; }
-.toggle-label { margin-bottom: 0 !important; }
+.slider-row { display: flex; align-items: center; gap: 8px; }
+.slider { flex: 1; }
+.slider:disabled { opacity: 0.35; cursor: not-allowed; }
+.opacity-row { display: flex; align-items: center; gap: 6px; }
+.opacity-row .slider { flex: 1; }
+.opacity-independent-btn { padding: 2px 6px; font-size: 10px; font-family: inherit; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: all 0.15s; flex-shrink: 0; }
+.opacity-independent-btn.on { background: var(--accent-purple-bg); border-color: var(--accent-purple); color: var(--accent-purple); }
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
-.opacity-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-purple); }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 </style>

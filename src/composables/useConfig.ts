@@ -136,8 +136,8 @@ export function useConfig() {
   function setCapColorFromHex(hex: string) {
     config.cap.color = hexToRgba(hex, config.cap.color.a)
   }
-  function setBodyFillColorFromHex(hex: string) {
-    config.body.fillColor = hexToRgba(hex, config.body.fillColor.a)
+  function setBodyColorFromHex(hex: string) {
+    config.body.color = hexToRgba(hex, config.body.color.a)
   }
   function setBodyBorderColorFromHex(hex: string) {
     config.body.borderColor = hexToRgba(hex, config.body.borderColor.a)
@@ -194,7 +194,7 @@ export function useConfig() {
     setBodyProp,
     setEffectProp,
     setCapColorFromHex,
-    setBodyFillColorFromHex,
+    setBodyColorFromHex,
     setBodyBorderColorFromHex,
     resetField,
     resetCapField,

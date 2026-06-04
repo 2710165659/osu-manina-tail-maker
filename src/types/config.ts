@@ -11,21 +11,23 @@ export const CAP_SHAPE_LABELS: Record<CapShape, string> = {
 export const CAP_SHAPE_ORDER: CapShape[] = ['ball', 'diamond', 'rect', 'gradient']
 
 export interface ImageConfig { width: number; height: number; filename: string }
-export interface CapConfig { shape: CapShape; scale: number; color: RgbaColor; independentOpacity: boolean; opacity: number }
-export interface BodyConfig { independentFill: boolean; fillColor: RgbaColor; fillOpacity: number; borderEnabled: boolean; borderColor: RgbaColor; borderOpacity: number; borderWidth: number }
+export interface CapConfig { shape: CapShape; scale: number; independentSettings: boolean; color: RgbaColor; opacity: number }
+export interface BodyConfig { independentSettings: boolean; color: RgbaColor; opacity: number; borderEnabled: boolean; borderColor: RgbaColor; borderOpacity: number; borderMatchBody: boolean; borderWidth: number }
 export interface EffectConfig { capEchoEnabled: boolean; echoColor: RgbaColor; echoOpacity: number; echoLength: number }
-export interface TailConfig { image: ImageConfig; margin: number; throwLength: number; cap: CapConfig; body: BodyConfig; effect: EffectConfig; globalOpacity: number }
+export interface TailConfig { image: ImageConfig; margin: number; throwLength: number; globalColor: RgbaColor; cap: CapConfig; body: BodyConfig; effect: EffectConfig; globalOpacity: number }
 export interface Preset { name: string; config: TailConfig; builtin: boolean }
 export interface ValidationResult { valid: boolean; errors: string[] }
 
 export function createDefaultConfig(): TailConfig {
+  const grey: RgbaColor = { r: 113, g: 113, b: 113, a: 255 }
   return {
     image: { width: 100, height: 32800, filename: 'mania-noteL' },
     margin: 8,
     throwLength: 100,
-    cap: { shape: 'ball', scale: 100, color: { r: 113, g: 113, b: 113, a: 255 }, independentOpacity: false, opacity: 255 },
-    body: { independentFill: false, fillColor: { r: 113, g: 113, b: 113, a: 255 }, fillOpacity: 255, borderEnabled: false, borderColor: { r: 255, g: 255, b: 255, a: 255 }, borderOpacity: 255, borderWidth: 1 },
-    effect: { capEchoEnabled: false, echoColor: { r: 113, g: 113, b: 113, a: 255 }, echoOpacity: 76, echoLength: 50 },
+    globalColor: grey,
+    cap: { shape: 'ball', scale: 100, independentSettings: false, color: grey, opacity: 255 },
+    body: { independentSettings: false, color: grey, opacity: 255, borderEnabled: false, borderColor: { r: 255, g: 255, b: 255, a: 255 }, borderOpacity: 255, borderMatchBody: false, borderWidth: 1 },
+    effect: { capEchoEnabled: false, echoColor: grey, echoOpacity: 76, echoLength: 50 },
     globalOpacity: 255,
   }
 }
@@ -51,6 +53,7 @@ export function isCapFieldDefault(config: TailConfig, field: keyof CapConfig): b
 export function isBodyFieldDefault(config: TailConfig, field: keyof BodyConfig): boolean {
   return JSON.stringify(config.body[field]) === JSON.stringify(DEFAULT_CONFIG.body[field])
 }
+
 
 /** 判断 effect 子字段是否为默认值 */
 export function isEffectFieldDefault(config: TailConfig, field: keyof EffectConfig): boolean {

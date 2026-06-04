@@ -26,12 +26,8 @@ pub fn draw_cap(
     let content_w = right - left;
     let cap_h = y_end - y_start;
 
-    let cap_color = config.cap.color;
-    let cap_opacity = if config.cap.independent_opacity {
-        config.cap.opacity
-    } else {
-        255
-    };
+    let cap_color = if config.cap.independent_settings { config.cap.color } else { config.global_color };
+    let cap_opacity = if config.cap.independent_settings { config.cap.opacity } else { config.global_opacity };
 
     match config.cap.shape {
         CapShape::Rect => {

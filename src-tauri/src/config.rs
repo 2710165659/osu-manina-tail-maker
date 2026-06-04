@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct TailConfig {
     pub image: ImageConfig,
     pub margin: u32,
-    /// 投的长度：图片顶部到第一个可见像素的透明距离
     pub throw_length: u32,
+    pub global_color: RgbaColor,
     pub cap: CapConfig,
     pub body: BodyConfig,
     pub effect: EffectConfig,
@@ -25,10 +25,9 @@ pub struct ImageConfig {
 #[serde(rename_all = "camelCase")]
 pub struct CapConfig {
     pub shape: CapShape,
-    /// 顶端缩放（默认 100 = 半圆；200 = 整圆高度；50 = 扁平）
     pub scale: u32,
+    pub independent_settings: bool,
     pub color: RgbaColor,
-    pub independent_opacity: bool,
     pub opacity: u8,
 }
 
@@ -47,12 +46,14 @@ pub enum CapShape {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BodyConfig {
-    pub independent_fill: bool,
-    pub fill_color: RgbaColor,
-    pub fill_opacity: u8,
+    pub independent_settings: bool,
+    pub color: RgbaColor,
+    pub opacity: u8,
     pub border_enabled: bool,
     pub border_color: RgbaColor,
     pub border_opacity: u8,
+    #[serde(default)]
+    pub border_match_body: bool,
     pub border_width: u32,
 }
 
@@ -107,27 +108,29 @@ impl TailConfig {
             },
             margin: 8,
             throw_length: 100,
+            global_color: RgbaColor::GREY,
             cap: CapConfig {
                 shape: CapShape::Ball,
                 scale: 100,
+                independent_settings: false,
                 color: RgbaColor::GREY,
-                independent_opacity: false,
                 opacity: 255,
             },
             body: BodyConfig {
-                independent_fill: false,
-                fill_color: RgbaColor::GREY,
-                fill_opacity: 255,
+                independent_settings: false,
+                color: RgbaColor::GREY,
+                opacity: 255,
                 border_enabled: false,
                 border_color: RgbaColor::WHITE,
                 border_opacity: 255,
+                border_match_body: false,
                 border_width: 1,
             },
             effect: EffectConfig {
                 cap_echo_enabled: false,
                 echo_color: RgbaColor::GREY,
-                echo_opacity: 76, // 255 * 0.3
-                echo_length: 50,  // throw_length / 2
+                echo_opacity: 76,
+                echo_length: 50,
             },
             global_opacity: 255,
         }
