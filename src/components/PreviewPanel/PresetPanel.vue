@@ -92,6 +92,7 @@ onMounted(() => {
           @click="handleLoad(preset)"
         >
           <div class="preset-thumb">
+            <span class="thumb-label">投：{{ preset.config.throwLength }}px</span>
             <div v-if="loadingThumbs && !thumbnails.has(preset.name)" class="thumb-loading">
               <span class="spinner"></span>
             </div>
@@ -202,7 +203,7 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
-/* 5列网格布局，最多显示3行，超出滚动 */
+/* 5列网格布局，约显示2.5行，超出滚动 */
 .preset-grid {
   flex: none;
   overflow-y: auto;
@@ -211,10 +212,10 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   grid-auto-rows: max-content;
-  gap: 10px;
+  gap: 8px;
   align-content: start;
-  /* 限制3行高度，超出滚动 */
-  max-height: min(600px, calc(85vh - 140px));
+  /* 约2.5行高度，第3行部分露出 */
+  max-height: min(580px, calc(85vh - 140px));
 }
 
 .preset-card {
@@ -235,7 +236,7 @@ onMounted(() => {
 
 .preset-thumb {
   width: 100%;
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 3 / 4;
   overflow: hidden;
   background: #0a0b14;
   border-bottom: 1px solid var(--border-color);
@@ -243,6 +244,20 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
+}
+.thumb-label {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #ff66aa;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1;
+  letter-spacing: -0.2px;
 }
 .thumb-img {
   width: 100%;

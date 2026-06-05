@@ -115,6 +115,33 @@ pub fn get_default_config() -> TailConfig {
     TailConfig::default_config()
 }
 
+/// 用默认浏览器打开 URL
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", &url])
+            .spawn()
+            .map_err(|e| format!("打开链接失败: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("打开链接失败: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("打开链接失败: {}", e))?;
+    }
+    Ok(())
+}
+
 /// 缓存目录：%LOCALAPPDATA%/osu-mania-tail-maker/cache
 fn cache_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("LOCALAPPDATA") {
