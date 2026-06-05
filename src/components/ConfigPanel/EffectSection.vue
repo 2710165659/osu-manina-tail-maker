@@ -102,7 +102,7 @@ function toggleEcho() {
     <!-- 暗化重复 -->
     <div class="subsection">
       <div class="toggle-row">
-        <label class="field-label toggle-label">暗化重复</label>
+        <label class="field-label toggle-label">暗化重复 <span v-if="isGradient" class="conflict-hint">与矩形渐变冲突</span></label>
         <div class="toggle-right">
           <button :class="['toggle', { on: config.effect.capEchoEnabled }]" :disabled="isGradient" @click="toggleEcho">
             <span class="toggle-knob"></span>
@@ -162,4 +162,5 @@ function toggleEcho() {
 .input-wrap .num-input { flex: 1; }
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.conflict-hint { font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
 </style>

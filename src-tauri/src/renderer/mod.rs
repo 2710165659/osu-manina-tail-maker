@@ -68,7 +68,7 @@ fn draw_echo_layer(img: &mut RgbaImage, config: &TailConfig, l: &RenderLayout) {
     draw_cap(&mut echo_layer, &echo_config, l.left, right, l.echo_start, echo_cap_end);
 
     let echo_color = config.effect.echo_color;
-    let a = (echo_color.a as u16 * config.effect.echo_opacity as u16 * config.global_opacity as u16 / 65025) as u8;
+    let a = (echo_color.a as u32 * config.effect.echo_opacity as u32 * config.global_opacity as u32 / 65025) as u8;
     let px = Rgba([echo_color.r, echo_color.g, echo_color.b, a]);
     let fill_end = l.cap_end.min(l.h);
     for y in echo_cap_end..fill_end {

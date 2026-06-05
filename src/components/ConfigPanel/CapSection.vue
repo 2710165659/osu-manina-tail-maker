@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, isCapFieldDefault } from '../../types/config'
+import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, isCapFieldDefault, type CapShape } from '../../types/config'
 import RevertButton from './RevertButton.vue'
 
-const { config, setCapProp, resetCapField } = useConfig()
+const { config, setCapProp, resetCapField, setEffectProp, resetEffectField } = useConfig()
 const shapes = CAP_SHAPE_ORDER
 
 const capScaleModel = ref(config.cap.scale)
@@ -27,6 +27,16 @@ const opacityModel = computed({
   set: (v: number) => setCapProp('opacity', Math.max(0, Math.min(255, v))),
 })
 const opacityPct = computed(() => Math.round((config.cap.opacity / 255) * 100))
+
+function selectShape(s: CapShape) {
+  setCapProp('shape', s)
+  if (s === 'gradient' && config.effect.capEchoEnabled) {
+    setEffectProp('capEchoEnabled', false)
+    resetEffectField('echoColor')
+    resetEffectField('echoOpacity')
+    resetEffectField('echoLength')
+  }
+}
 
 function toggleIndependent() {
   const next = !config.cap.independentSettings
@@ -52,7 +62,7 @@ function toggleIndependent() {
         <RevertButton :visible="!isCapFieldDefault(config, 'shape')" @revert="resetCapField('shape')" />
       </div>
       <div class="shape-selector">
-        <button v-for="s in shapes" :key="s" :class="['shape-btn', { active: config.cap.shape === s }]" @click="setCapProp('shape', s)">
+        <button v-for="s in shapes" :key="s" :class="['shape-btn', { active: config.cap.shape === s }]" @click="selectShape(s)">
           <svg class="shape-preview-svg" width="20" height="16" viewBox="0 0 20 16" fill="none">
             <template v-if="s === 'ball'">
               <ellipse cx="10" cy="0" rx="6" ry="8" stroke="currentColor" stroke-width="1.2" fill="currentColor" fill-opacity="0.3"/>
