@@ -53,6 +53,7 @@ pub fn render(config: &TailConfig) -> RgbaImage {
     draw_echo_layer(&mut img, config, &layout);
     draw_cap_layer(&mut img, config, &layout);
     draw_body_layer(&mut img, config, &layout);
+    draw_border_layer(&mut img, config);
 
     img
 }
@@ -99,6 +100,94 @@ fn draw_body_layer(img: &mut RgbaImage, config: &TailConfig, l: &RenderLayout) {
 }
 
 
+
+/// 一维形态学腐蚀：对行/列上每个像素取其半径 radius 邻域内的最小值
+/// 边界处窗口截断（不镜像/不填充）
+fn erode_1d(buf: &mut [u8], length: usize, stride: usize, radius: u32) {
+    let r = radius as usize;
+    let mut tmp = vec![0u8; length];
+    for i in 0..length {
+        let lo = i.saturating_sub(r);
+        let hi = (i + r).min(length - 1);
+        let mut min_val = 255u8;
+        for j in lo..=hi {
+            let v = buf[j * stride];
+            if v < min_val {
+                min_val = v;
+            }
+        }
+        tmp[i] = min_val;
+    }
+    for i in 0..length {
+        buf[i * stride] = tmp[i];
+    }
+}
+
+/// 形态学腐蚀：分离式两遍（水平 + 垂直），时间复杂度 O(W×H)
+/// mask 中非零像素视为前景，腐蚀后前景收缩 radius 像素
+fn erode_mask(mask: &mut [u8], w: u32, h: u32, radius: u32) {
+    if radius == 0 { return; }
+    // 水平：每行独立腐蚀
+    for y in 0..h as usize {
+        let row_start = y * w as usize;
+        erode_1d(&mut mask[row_start..row_start + w as usize], w as usize, 1, radius);
+    }
+    // 垂直：每列独立腐蚀
+    for x in 0..w as usize {
+        erode_1d(&mut mask[x..], h as usize, w as usize, radius);
+    }
+}
+
+/// 边框渲染层：对合成图像中所有非透明像素的边缘做形态学腐蚀，
+/// 腐蚀差集即为边框区域，用边框颜色替换
+fn draw_border_layer(img: &mut RgbaImage, config: &TailConfig) {
+    if !config.body.border_enabled || config.body.border_width == 0 { return; }
+
+    let w = img.width();
+    let h = img.height();
+    let border_width = config.body.border_width;
+    let (br, bg, bb) = if config.body.border_match_body {
+        let bc = if config.body.independent_settings {
+            config.body.color
+        } else {
+            config.global_color
+        };
+        (bc.r, bc.g, bc.b)
+    } else {
+        let bc = config.body.border_color;
+        (bc.r, bc.g, bc.b)
+    };
+
+    // 1. 提取 alpha 通道作为二值 mask（>0 即前景）
+    let len = (w * h) as usize;
+    let mut mask: Vec<u8> = Vec::with_capacity(len);
+    for pixel in img.pixels() {
+        mask.push(if pixel[3] > 0 { 255 } else { 0 });
+    }
+
+    // 2. 形态学腐蚀：前景向内收缩 border_width 像素
+    let mut eroded = mask.clone();
+    erode_mask(&mut eroded, w, h, border_width);
+
+    // 3. 差集 = 边框区域：原 mask 非零 且 腐蚀后为零
+    //    同时根据透明度规则计算边框颜色
+    let border_opacity = config.body.border_opacity;
+    let independent = config.body.border_opacity_independent;
+
+    for i in 0..len {
+        if mask[i] == 0 || eroded[i] != 0 {
+            continue;
+        }
+        let alpha = if independent {
+            border_opacity
+        } else {
+            // 非独立：透明度 = 被挤占像素的透明度
+            img.as_flat_samples().samples[i * 4 + 3]
+        };
+        let px = img.get_pixel_mut(i as u32 % w, i as u32 / w);
+        *px = Rgba([br, bg, bb, alpha]);
+    }
+}
 
 fn create_echo_config(config: &TailConfig) -> TailConfig {
     let mut echo_config = config.clone();

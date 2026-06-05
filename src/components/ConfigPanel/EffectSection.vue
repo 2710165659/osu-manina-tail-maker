@@ -69,7 +69,7 @@ function toggleEcho() {
       <div class="toggle-row">
         <label class="field-label toggle-label">边框</label>
         <div class="toggle-right">
-          <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); resetBodyField('borderColor'); resetBodyField('borderOpacity'); resetBodyField('borderWidth') }">
+          <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); resetBodyField('borderColor'); resetBodyField('borderOpacity'); resetBodyField('borderOpacityIndependent'); resetBodyField('borderWidth') }">
             <span class="toggle-knob"></span>
           </button>
         </div>
@@ -88,7 +88,8 @@ function toggleEcho() {
           <span class="sub-label">透明度</span>
         </div>
         <div class="slider-row">
-          <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider" />
+          <button :class="['opacity-independent-btn', { on: config.body.borderOpacityIndependent }]" @click="setBodyProp('borderOpacityIndependent', !config.body.borderOpacityIndependent)">独立</button>
+          <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider" :disabled="!config.body.borderOpacityIndependent" />
           <span class="slider-val">{{ borderOpacityPct }}%</span>
         </div>
 
@@ -157,6 +158,11 @@ function toggleEcho() {
 .hex-input:focus { border-color: var(--accent-purple); }
 .slider-row { display: flex; align-items: center; gap: 8px; }
 .slider { flex: 1; }
+.slider:disabled { opacity: 0.35; cursor: not-allowed; }
+.opacity-independent-btn { padding: 2px 6px; font-size: 10px; font-family: inherit; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: all 0.15s; flex-shrink: 0; }
+.opacity-independent-btn:hover { border-color: var(--text-muted); color: var(--text-secondary); }
+.opacity-independent-btn.on { background: var(--accent-purple-bg); border-color: var(--accent-purple); color: var(--accent-purple); }
+.opacity-independent-btn.on:hover { background: var(--accent-purple); color: #fff; }
 .narrow { max-width: 80px; }
 .input-wrap { position: relative; display: flex; align-items: center; gap: 6px; }
 .input-wrap .num-input { flex: 1; }

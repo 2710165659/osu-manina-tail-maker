@@ -53,6 +53,8 @@ pub struct BodyConfig {
     pub border_color: RgbaColor,
     pub border_opacity: u8,
     #[serde(default)]
+    pub border_opacity_independent: bool,
+    #[serde(default)]
     pub border_match_body: bool,
     pub border_width: u32,
 }
@@ -123,6 +125,7 @@ impl TailConfig {
                 border_enabled: false,
                 border_color: RgbaColor::WHITE,
                 border_opacity: 255,
+                border_opacity_independent: false,
                 border_match_body: false,
                 border_width: 1,
             },
