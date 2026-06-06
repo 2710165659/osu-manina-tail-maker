@@ -1,6 +1,6 @@
 use crate::renderer::cap::draw_cap_layer;
 use crate::renderer::body::draw_body_layer;
-use crate::renderer::effects::{draw_echo_layer, draw_border_layer};
+use crate::renderer::effects::{draw_echo_layer, draw_border_layer, draw_glow_layer};
 
 use crate::config::{CapShape, TailConfig};
 use image::{ImageBuffer, Rgba, RgbaImage};
@@ -51,6 +51,7 @@ pub fn render(config: &TailConfig) -> RgbaImage {
     draw_cap_layer(&mut pixmap, config, &layout);
     draw_body_layer(&mut pixmap, config, &layout);
     draw_border_layer(&mut pixmap, config);
+    draw_glow_layer(&mut pixmap, config);
 
     pixmap_to_image(pixmap)
 }

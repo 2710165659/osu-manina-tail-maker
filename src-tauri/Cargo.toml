@@ -1,10 +1,10 @@
 [package]
 name = "osu-mania-tail-maker"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "osu!mania NoteL maker"
+authors = ["xuan_yuan"]
 license = ""
-repository = ""
+repository = "https://github.com/2710165659/osu-manina-tail-maker"
 edition = "2021"
 rust-version = "1.77.2"
 

@@ -70,7 +70,33 @@ pub struct EffectConfig {
     pub echo_opacity: u8,
     /// 重复长度
     pub echo_length: u32,
+    /// 外发光开关
+    #[serde(default)]
+    pub glow_enabled: bool,
+    /// 外发光颜色
+    #[serde(default = "default_glow_color")]
+    pub glow_color: RgbaColor,
+    /// 外发光透明度
+    #[serde(default = "default_glow_opacity")]
+    pub glow_opacity: u8,
+    /// 外发光模糊半径
+    #[serde(default = "default_glow_size")]
+    pub glow_size: u32,
+    /// 外发光扩展半径
+    #[serde(default = "default_glow_spread")]
+    pub glow_spread: u32,
+    /// 外发光是否跟随主体颜色
+    #[serde(default)]
+    pub glow_match_body: bool,
+    /// 外发光透明度是否独立
+    #[serde(default)]
+    pub glow_opacity_independent: bool,
 }
+
+fn default_glow_color() -> RgbaColor { RgbaColor { r: 144, g: 238, b: 144, a: 255 } }
+fn default_glow_opacity() -> u8 { 180 }
+fn default_glow_size() -> u32 { 8 }
+fn default_glow_spread() -> u32 { 4 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RgbaColor {
@@ -134,6 +160,13 @@ impl TailConfig {
                 echo_color: RgbaColor::GREY,
                 echo_opacity: 76,
                 echo_length: 50,
+                glow_enabled: false,
+                glow_color: RgbaColor { r: 144, g: 238, b: 144, a: 255 },
+                glow_opacity: 180,
+                glow_size: 8,
+                glow_spread: 4,
+                glow_match_body: false,
+                glow_opacity_independent: false,
             },
             global_opacity: 255,
         }

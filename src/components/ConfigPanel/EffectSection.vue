@@ -22,6 +22,41 @@ const borderWidthModel = computed({
   set: (v: number) => setBodyProp('borderWidth', Math.max(1, v)),
 })
 
+// 外发光
+const glowHex = ref(rgbaToHex(config.effect.glowColor))
+watch(() => config.effect.glowColor, (c) => { glowHex.value = rgbaToHex(c) })
+function applyGlowHex(v: string) {
+  const clean = v.replace('#', '').trim()
+  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.effect.glowColor = hexToRgba('#' + clean, config.effect.glowColor.a)
+}
+const glowOpacityModel = computed({
+  get: () => config.effect.glowOpacity,
+  set: (v: number) => setEffectProp('glowOpacity', Math.max(0, Math.min(255, v))),
+})
+const glowOpacityPct = computed(() => Math.round((config.effect.glowOpacity / 255) * 100))
+const glowSizeModel = computed({
+  get: () => config.effect.glowSize,
+  set: (v: number) => setEffectProp('glowSize', Math.max(0, Math.min(100, v))),
+})
+const glowSpreadModel = computed({
+  get: () => config.effect.glowSpread,
+  set: (v: number) => setEffectProp('glowSpread', Math.max(0, Math.min(100, v))),
+})
+function toggleGlow() {
+  const next = !config.effect.glowEnabled
+  setEffectProp('glowEnabled', next)
+  if (next) {
+    setEffectProp('glowColor', { r: 144, g: 238, b: 144, a: 255 })
+  } else {
+    resetEffectField('glowColor')
+    resetEffectField('glowOpacity')
+    resetEffectField('glowSize')
+    resetEffectField('glowSpread')
+    resetEffectField('glowMatchBody')
+    resetEffectField('glowOpacityIndependent')
+  }
+}
+
 // 暗化重复
 const echoHex = ref(rgbaToHex(config.effect.echoColor))
 watch(() => config.effect.echoColor, (c) => { echoHex.value = rgbaToHex(c) })
@@ -61,8 +96,9 @@ function toggleEcho() {
   <section class="config-section">
     <h3 class="section-title">
       <svg width="14" height="14" viewBox="0 0 14 14" class="section-icon-svg">
-        <rect x="2" y="2" width="10" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.5"/>
-        <rect x="2" y="7" width="10" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <rect x="2" y="2" width="10" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"
+          opacity="0.5" />
+        <rect x="2" y="7" width="10" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" />
       </svg>
       效果
     </h3>
@@ -70,9 +106,10 @@ function toggleEcho() {
     <!-- 边框 -->
     <div class="subsection">
       <div class="toggle-row">
-        <label class="field-label toggle-label">边框</label>
+        <label class="field-label toggle-label">内边框</label>
         <div class="toggle-right">
-          <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); resetBodyField('borderColor'); resetBodyField('borderOpacity'); resetBodyField('borderOpacityIndependent'); resetBodyField('borderWidth') }">
+          <button :class="['toggle', { on: config.body.borderEnabled }]"
+            @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); resetBodyField('borderColor'); resetBodyField('borderOpacity'); resetBodyField('borderOpacityIndependent'); resetBodyField('borderWidth') }">
             <span class="toggle-knob"></span>
           </button>
         </div>
@@ -83,16 +120,20 @@ function toggleEcho() {
           <span class="sub-label">颜色</span>
         </div>
         <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.body.borderColor)" class="color-picker" @input="applyBorderHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="bHex" class="hex-input" maxlength="7" @change="applyBorderHex(bHex)" @blur="applyBorderHex(bHex)" />
+          <input type="color" :value="rgbaToHex(config.body.borderColor)" class="color-picker"
+            @input="applyBorderHex(($event.target as HTMLInputElement).value)" />
+          <input v-model="bHex" class="hex-input" maxlength="7" @change="applyBorderHex(bHex)"
+            @blur="applyBorderHex(bHex)" />
         </div>
 
         <div class="opacity-label-row">
           <span class="sub-label">透明度</span>
         </div>
         <div class="slider-row">
-          <button :class="['opacity-independent-btn', { on: config.body.borderOpacityIndependent }]" @click="setBodyProp('borderOpacityIndependent', !config.body.borderOpacityIndependent)">独立</button>
-          <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider" :disabled="!config.body.borderOpacityIndependent" />
+          <button :class="['opacity-independent-btn', { on: config.body.borderOpacityIndependent }]"
+            @click="setBodyProp('borderOpacityIndependent', !config.body.borderOpacityIndependent)">独立</button>
+          <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider"
+            :disabled="!config.body.borderOpacityIndependent" />
           <span class="slider-val">{{ borderOpacityPct }}%</span>
         </div>
 
@@ -106,7 +147,8 @@ function toggleEcho() {
     <!-- 暗化重复 -->
     <div class="subsection">
       <div class="toggle-row">
-        <label class="field-label toggle-label">暗化重复 <span v-if="isGradient" class="conflict-hint">与矩形渐变冲突</span></label>
+        <label class="field-label toggle-label">暗化重复 <span v-if="isGradient"
+            class="conflict-hint">与矩形渐变冲突</span></label>
         <div class="toggle-right">
           <button :class="['toggle', { on: config.effect.capEchoEnabled }]" :disabled="isGradient" @click="toggleEcho">
             <span class="toggle-knob"></span>
@@ -119,8 +161,10 @@ function toggleEcho() {
           <span class="sub-label">颜色</span>
         </div>
         <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.effect.echoColor)" class="color-picker" @input="applyEchoHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="echoHex" class="hex-input" maxlength="7" @change="applyEchoHex(echoHex)" @blur="applyEchoHex(echoHex)" />
+          <input type="color" :value="rgbaToHex(config.effect.echoColor)" class="color-picker"
+            @input="applyEchoHex(($event.target as HTMLInputElement).value)" />
+          <input v-model="echoHex" class="hex-input" maxlength="7" @change="applyEchoHex(echoHex)"
+            @blur="applyEchoHex(echoHex)" />
         </div>
 
         <div class="opacity-label-row">
@@ -137,39 +181,248 @@ function toggleEcho() {
         </div>
       </div>
     </div>
+
+    <!-- 外发光 -->
+    <div class="subsection">
+      <div class="toggle-row">
+        <label class="field-label toggle-label">外发光 <span class="conflict-hint">暂不可用</span></label>
+        <div class="toggle-right">
+          <button :class="['toggle']" disabled title="暂不可用">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="config.effect.glowEnabled" class="sub-settings fade-in">
+        <div class="sub-label-row">
+          <span class="sub-label">颜色</span>
+          <button :class="['opacity-independent-btn', { on: config.effect.glowMatchBody }]"
+            @click="setEffectProp('glowMatchBody', !config.effect.glowMatchBody)">跟随主体</button>
+        </div>
+        <div class="color-row">
+          <input type="color" :value="rgbaToHex(config.effect.glowColor)" class="color-picker"
+            @input="applyGlowHex(($event.target as HTMLInputElement).value)" :disabled="config.effect.glowMatchBody" />
+          <input v-model="glowHex" class="hex-input" maxlength="7" @change="applyGlowHex(glowHex)"
+            @blur="applyGlowHex(glowHex)" :disabled="config.effect.glowMatchBody" />
+        </div>
+
+        <div class="opacity-label-row">
+          <span class="sub-label">透明度</span>
+        </div>
+        <div class="slider-row">
+          <button :class="['opacity-independent-btn', { on: config.effect.glowOpacityIndependent }]"
+            @click="setEffectProp('glowOpacityIndependent', !config.effect.glowOpacityIndependent)">独立</button>
+          <input v-model.number="glowOpacityModel" type="range" min="0" max="255" class="slider"
+            :disabled="!config.effect.glowOpacityIndependent" />
+          <span class="slider-val">{{ glowOpacityPct }}%</span>
+        </div>
+
+        <div class="other-label">大小 <span class="unit">px</span></div>
+        <div class="input-wrap">
+          <input v-model.number="glowSizeModel" type="number" min="0" max="100" class="num-input narrow" />
+        </div>
+
+        <div class="other-label">扩展 <span class="unit">px</span></div>
+        <div class="input-wrap">
+          <input v-model.number="glowSpreadModel" type="number" min="0" max="100" class="num-input narrow" />
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.section-icon-svg { color: var(--accent-purple); flex-shrink: 0; }
-.subsection { margin-bottom: 14px; }
-.subsection:last-child { margin-bottom: 0; }
-.toggle-row { display: flex; align-items: center; justify-content: space-between; }
-.toggle-label { margin-bottom: 0 !important; }
-.toggle-right { display: flex; align-items: center; gap: 6px; }
-.toggle:disabled { opacity: 0.4; cursor: not-allowed; }
-.sub-settings { margin-top: 8px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 2px solid var(--accent-purple); }
-.sub-label-row, .opacity-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.opacity-label-row { margin-top: 10px; }
-.sub-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
-.other-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; margin-top: 10px; margin-bottom: 4px; }
-.color-row { display: flex; align-items: center; gap: 6px; }
-.color-picker { width: 30px; height: 30px; border: 2px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; background: transparent; padding: 2px; }
-.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
-.color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
-.hex-input { width: 72px; padding: 4px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
-.hex-input:focus { border-color: var(--accent-purple); }
-.slider-row { display: flex; align-items: center; gap: 8px; }
-.slider { flex: 1; }
-.slider:disabled { opacity: 0.35; cursor: not-allowed; }
-.opacity-independent-btn { padding: 2px 6px; font-size: 10px; font-family: inherit; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: all 0.15s; flex-shrink: 0; }
-.opacity-independent-btn:hover { border-color: var(--text-muted); color: var(--text-secondary); }
-.opacity-independent-btn.on { background: var(--accent-purple-bg); border-color: var(--accent-purple); color: var(--accent-purple); }
-.opacity-independent-btn.on:hover { background: var(--accent-purple); color: #fff; }
-.narrow { max-width: 80px; }
-.input-wrap { position: relative; display: flex; align-items: center; gap: 6px; }
-.input-wrap .num-input { flex: 1; }
-.fade-in { animation: fadeSlideIn 0.25s ease-out; }
-@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-.conflict-hint { font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+.section-icon-svg {
+  color: var(--accent-purple);
+  flex-shrink: 0;
+}
+
+.subsection {
+  margin-bottom: 14px;
+}
+
+.subsection:last-child {
+  margin-bottom: 0;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle-label {
+  margin-bottom: 0 !important;
+}
+
+.toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sub-settings {
+  margin-top: 8px;
+  padding: 10px;
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  border-left: 2px solid var(--accent-purple);
+}
+
+.sub-label-row,
+.opacity-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.opacity-label-row {
+  margin-top: 10px;
+}
+
+.sub-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.other-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-picker {
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: transparent;
+  padding: 2px;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+  border-radius: 2px;
+  border: none;
+}
+
+.hex-input {
+  width: 72px;
+  padding: 4px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  letter-spacing: 0.5px;
+}
+
+.hex-input:focus {
+  border-color: var(--accent-purple);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider {
+  flex: 1;
+}
+
+.slider:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.opacity-independent-btn {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: inherit;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.opacity-independent-btn:hover {
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
+}
+
+.opacity-independent-btn.on {
+  background: var(--accent-purple-bg);
+  border-color: var(--accent-purple);
+  color: var(--accent-purple);
+}
+
+.opacity-independent-btn.on:hover {
+  background: var(--accent-purple);
+  color: #fff;
+}
+
+.narrow {
+  max-width: 80px;
+}
+
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.input-wrap .num-input {
+  flex: 1;
+}
+
+.fade-in {
+  animation: fadeSlideIn 0.25s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.conflict-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
+}
 </style>
