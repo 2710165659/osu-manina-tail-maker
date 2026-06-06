@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { useConfig } from './composables/useConfig'
 import ConfigPanel from './components/ConfigPanel/ConfigPanel.vue'
 import PreviewPanel from './components/PreviewPanel/PreviewPanel.vue'
+import NotificationToast from './components/NotificationToast.vue'
 
 const { init, loadUserPresets } = useConfig()
 
@@ -16,6 +17,7 @@ onMounted(async () => {
   <div class="app-shell">
     <PreviewPanel />
     <ConfigPanel />
+    <NotificationToast />
   </div>
 </template>
 
