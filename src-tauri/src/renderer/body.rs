@@ -1,33 +1,27 @@
-use crate::config::TailConfig;
-use image::{Rgba, RgbaImage};
+use crate::config::{RgbaColor, TailConfig};
+use tiny_skia::*;
 
-/// 绘制身体区域（纯填充，边框在渲染管线统一处理）
-/// 独立设置关闭时，使用投皮头的颜色和透明度
 pub fn draw_body(
-    img: &mut RgbaImage,
+    pixmap: &mut PixmapMut,
     config: &TailConfig,
     left: u32,
     right: u32,
     y_start: u32,
     body_height: u32,
 ) {
-    let h = img.height();
-    let w = img.width();
-    let y_end = (y_start + body_height).min(h);
-    let right = right.min(w);
-    if y_start >= h || left >= right {
-        return;
-    }
+    if body_height == 0 || left >= right { return; }
     let (fc, fo) = if config.body.independent_settings {
         (config.body.color, config.body.opacity)
     } else {
         (config.global_color, config.global_opacity)
     };
-    let a = (fc.a as u16 * fo as u16 / 255) as u8;
-    let px = Rgba([fc.r, fc.g, fc.b, a]);
-    for y in y_start..y_end {
-        for x in left..right {
-            img.put_pixel(x, y, px);
-        }
-    }
+    let rect = Rect::from_xywh(left as f32, y_start as f32, (right - left) as f32, body_height as f32).unwrap();
+    let mut paint = Paint::default();
+    paint.set_color(solid_color(fc, fo));
+    pixmap.fill_rect(rect, &paint, Transform::identity(), None);
+}
+
+fn solid_color(c: RgbaColor, opacity: u8) -> Color {
+    let a = (c.a as u16 * opacity as u16 / 255) as u8;
+    Color::from_rgba8(c.r, c.g, c.b, a)
 }

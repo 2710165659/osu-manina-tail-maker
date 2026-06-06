@@ -1,141 +1,101 @@
-use crate::config::{CapShape, TailConfig};
-use image::{Rgba, RgbaImage};
+use crate::config::{CapShape, RgbaColor, TailConfig};
+use tiny_skia::*;
 
-/// 超采样倍率（用于抗锯齿）
-const SSAA: u32 = 4;
-const SSAA2: u32 = SSAA * SSAA;
-
-/// 绘制 Cap 区域
 pub fn draw_cap(
-    img: &mut RgbaImage,
+    pixmap: &mut PixmapMut,
     config: &TailConfig,
     left: u32,
     right: u32,
     y_start: u32,
     y_end: u32,
 ) {
-    let h = img.height();
-    let w = img.width();
-    let y_start = y_start.min(h);
-    let y_end = y_end.min(h);
-    let left = left.min(w);
-    let right = right.min(w);
-    if y_start >= y_end || left >= right {
-        return;
-    }
-    let content_w = right - left;
-    let cap_h = y_end - y_start;
+    if y_start >= y_end || left >= right { return; }
 
-    let cap_color = if config.cap.independent_settings { config.cap.color } else { config.global_color };
-    let cap_opacity = if config.cap.independent_settings { config.cap.opacity } else { config.global_opacity };
+    let color = if config.cap.independent_settings { config.cap.color } else { config.global_color };
+    let opacity = if config.cap.independent_settings { config.cap.opacity } else { config.global_opacity };
 
     match config.cap.shape {
-        CapShape::Rect => {
-            // 矩形：填满整个内容区
-            for y in y_start..y_end {
-                for x in left..right {
-                    img.put_pixel(x, y, rgba_pixel(cap_color, cap_opacity));
-                }
-            }
-        }
-        CapShape::Ball => {
-            // 上半椭圆：圆心在 Cap 最后一行中心，确保底部达到全宽
-            let cx = (left + right) as f64 / 2.0;
-            let cy = y_end.saturating_sub(1) as f64; // 圆心在最后一行，确保绘制范围底边全宽
-            let rx = content_w as f64 / 2.0;
-            let ry = cap_h.saturating_sub(1).max(1) as f64;
-
-            for y in y_start..y_end {
-                for x in left..right {
-                    let coverage = ellipse_coverage(x, y, cx, cy, rx, ry);
-                    if coverage > 0.0 {
-                        let alpha = (coverage * cap_opacity as f64).round() as u8;
-                        img.put_pixel(x, y, rgba_pixel(cap_color, alpha));
-                    }
-                }
-            }
-        }
-        CapShape::Diamond => {
-            // 上半菱形：顶点在 Cap 起始线中心，底部宽度 = 内容区宽度
-            let cx = (left + right) as f64 / 2.0;
-            let div = cap_h.saturating_sub(1).max(1) as f64; // 确保最后一行 t=1.0，底部全宽
-            for y in y_start..y_end {
-                let t = (y - y_start) as f64 / div; // 0(顶) → 1(底)
-                let half_w = (content_w as f64 / 2.0) * t; // 从 0 扩展到 content_w/2
-                let left_bound = cx - half_w;
-                let right_bound = cx + half_w;
-
-                for x in left..right {
-                    let coverage = diamond_coverage(
-                        x, y,
-                        left_bound, right_bound,
-                    );
-                    if coverage > 0.0 {
-                        let alpha = (coverage * cap_opacity as f64).round() as u8;
-                        img.put_pixel(x, y, rgba_pixel(cap_color, alpha));
-                    }
-                }
-            }
-        }
-        CapShape::Gradient => {
-            // 矩形 + 透明度渐变：从上到下透明度递增
-            let div = cap_h.saturating_sub(1).max(1) as f64;
-            for y in y_start..y_end {
-                let t = (y - y_start) as f64 / div; // 0(顶,全透明) → 1(底,目标透明度)
-                let row_alpha = (t * cap_opacity as f64).round() as u8;
-
-                for x in left..right {
-                    img.put_pixel(x, y, rgba_pixel(cap_color, row_alpha));
-                }
-            }
-        }
+        CapShape::Rect => draw_rect(pixmap, left, right, y_start, y_end, color, opacity),
+        CapShape::Ball => draw_ball(pixmap, left, right, y_start, y_end, color, opacity),
+        CapShape::Diamond => draw_diamond(pixmap, left, right, y_start, y_end, color, opacity),
+        CapShape::Gradient => draw_gradient(pixmap, left, right, y_start, y_end, color, opacity),
     }
 }
 
-/// 椭圆覆盖率：对像素 (px,py) 进行超采样，计算落在椭圆内的子采样比例
-/// 椭圆方程：(x-cx)²/rx² + (y-cy)²/ry² ≤ 1.0
-fn ellipse_coverage(px: u32, py: u32, cx: f64, cy: f64, rx: f64, ry: f64) -> f64 {
-    let mut count = 0u32;
-    for si in 0..SSAA {
-        let sy = py as f64 + (si as f64 + 0.5) / SSAA as f64;
-        for sj in 0..SSAA {
-            let sx = px as f64 + (sj as f64 + 0.5) / SSAA as f64;
-            let dx = (sx - cx) / rx;
-            let dy = (sy - cy) / ry;
-            if dx * dx + dy * dy <= 1.0 {
-                count += 1;
-            }
-        }
-    }
-    count as f64 / SSAA2 as f64
+fn to_color(c: RgbaColor, opacity: u8) -> Color {
+    let a = (c.a as u16 * opacity as u16 / 255) as u8;
+    Color::from_rgba8(c.r, c.g, c.b, a)
 }
 
-/// 菱形覆盖率：像素在菱形左右边界之间的比例
-fn diamond_coverage(px: u32, _py: u32, left: f64, right: f64) -> f64 {
-    let px_f = px as f64;
-    // 像素中心在边界内
-    if px_f + 0.5 <= left || px_f - 0.5 >= right {
-        return 0.0;
-    }
-    if px_f - 0.5 >= left && px_f + 0.5 <= right {
-        return 1.0;
-    }
-    // 像素部分覆盖（边缘抗锯齿）
-    let overlap_left = if px_f - 0.5 < left {
-        (px_f + 0.5 - left).max(0.0).min(1.0)
-    } else {
-        1.0
-    };
-    let overlap_right = if px_f + 0.5 > right {
-        (right - (px_f - 0.5)).max(0.0).min(1.0)
-    } else {
-        1.0
-    };
-    overlap_left.min(overlap_right).max(0.0)
+fn solid_paint(c: RgbaColor, opacity: u8) -> Paint<'static> {
+    let mut paint = Paint::default();
+    paint.set_color(to_color(c, opacity));
+    paint.anti_alias = true;
+    paint
 }
 
-/// 将 RgbaColor + opacity 转为 Rgba<u8> 像素
-fn rgba_pixel(color: crate::config::RgbaColor, opacity: u8) -> Rgba<u8> {
-    let a = (color.a as u16 * opacity as u16 / 255) as u8;
-    Rgba([color.r, color.g, color.b, a])
+fn draw_rect(pixmap: &mut PixmapMut, left: u32, right: u32, y_start: u32, y_end: u32, color: RgbaColor, opacity: u8) {
+    let rect = Rect::from_xywh(left as f32, y_start as f32, (right - left) as f32, (y_end - y_start) as f32).unwrap();
+    pixmap.fill_rect(rect, &solid_paint(color, opacity), Transform::identity(), None);
+}
+
+fn draw_ball(pixmap: &mut PixmapMut, left: u32, right: u32, y_start: u32, y_end: u32, color: RgbaColor, opacity: u8) {
+    // 上半椭圆：圆心在 y_end（底边），椭圆下半会溢出，用 ClipMask 裁剪到 cap 区域
+    let cx = (left + right) as f32 / 2.0;
+    let cy = y_end as f32;
+    let rx = (right - left) as f32 / 2.0;
+    let ry = y_end.saturating_sub(y_start).max(1) as f32;
+
+    let oval_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0).unwrap();
+    let mut pb = PathBuilder::new();
+    pb.push_oval(oval_rect);
+    let path = pb.finish().unwrap();
+
+    // 裁剪矩形路径，只保留 cap 区域内的像素
+    let clip_rect = Rect::from_xywh(left as f32, y_start as f32, (right - left) as f32, (y_end - y_start) as f32).unwrap();
+    let mut clip_pb = PathBuilder::new();
+    clip_pb.push_rect(clip_rect);
+    let clip_path = clip_pb.finish().unwrap();
+    let mut mask = Mask::new(pixmap.width(), pixmap.height()).unwrap();
+    mask.fill_path(&clip_path, FillRule::Winding, false, Transform::identity());
+
+    pixmap.fill_path(&path, &solid_paint(color, opacity), FillRule::Winding, Transform::identity(), Some(&mask));
+}
+
+fn draw_diamond(pixmap: &mut PixmapMut, left: u32, right: u32, y_start: u32, y_end: u32, color: RgbaColor, opacity: u8) {
+    let cx = (left + right) as f32 / 2.0;
+    let top_y = y_start as f32;
+    let bot_y = y_end as f32;
+
+    let mut pb = PathBuilder::new();
+    pb.move_to(cx, top_y);
+    pb.line_to(right as f32, bot_y);
+    pb.line_to(left as f32, bot_y);
+    pb.close();
+    let path = pb.finish().unwrap();
+
+    pixmap.fill_path(&path, &solid_paint(color, opacity), FillRule::Winding, Transform::identity(), None);
+}
+
+fn draw_gradient(pixmap: &mut PixmapMut, left: u32, right: u32, y_start: u32, y_end: u32, color: RgbaColor, opacity: u8) {
+    let a_top = to_color(color, 0);
+    let a_bot = to_color(color, opacity);
+
+    let gradient = LinearGradient::new(
+        Point::from_xy(0.0, y_start as f32),
+        Point::from_xy(0.0, (y_end - 1) as f32),
+        vec![
+            GradientStop::new(0.0, a_top),
+            GradientStop::new(1.0, a_bot),
+        ],
+        SpreadMode::Pad,
+        Transform::identity(),
+    ).unwrap();
+
+    let mut paint = Paint::default();
+    paint.shader = gradient;
+    paint.anti_alias = false;
+
+    let rect = Rect::from_xywh(left as f32, y_start as f32, (right - left) as f32, (y_end - y_start) as f32).unwrap();
+    pixmap.fill_rect(rect, &paint, Transform::identity(), None);
 }

@@ -1,15 +1,17 @@
 mod cap;
 mod body;
+mod morph;
 
 use cap::draw_cap;
 use body::draw_body;
+use morph::erode_mask;
 
-use crate::config::{CapShape, TailConfig};
+use crate::config::{CapShape, RgbaColor, TailConfig};
 use image::{ImageBuffer, Rgba, RgbaImage};
+use tiny_skia::*;
 
 pub const PREVIEW_MAX_ROWS: u32 = 500;
 
-/// 渲染参数：所有绘制所需信息预先计算，解耦各层
 struct RenderLayout {
     w: u32,
     h: u32,
@@ -19,7 +21,6 @@ struct RenderLayout {
     echo_enabled: bool,
     echo_start: u32,
     echo_cap_end: u32,
-
     cap_start: u32,
     cap_end: u32,
     body_start: u32,
@@ -48,145 +49,124 @@ impl RenderLayout {
 
 pub fn render(config: &TailConfig) -> RgbaImage {
     let layout = RenderLayout::new(config);
-    let mut img: RgbaImage = ImageBuffer::from_pixel(layout.w, layout.h, Rgba([0, 0, 0, 0]));
+    let mut pixmap = Pixmap::new(layout.w, layout.h).unwrap();
 
-    draw_echo_layer(&mut img, config, &layout);
-    draw_cap_layer(&mut img, config, &layout);
-    draw_body_layer(&mut img, config, &layout);
-    draw_border_layer(&mut img, config);
+    draw_echo_layer(&mut pixmap, config, &layout);
+    draw_cap_layer(&mut pixmap, config, &layout);
+    draw_body_layer(&mut pixmap, config, &layout);
+    draw_border_layer(&mut pixmap, config);
 
-    img
+    pixmap_to_image(pixmap)
 }
 
-fn draw_echo_layer(img: &mut RgbaImage, config: &TailConfig, l: &RenderLayout) {
-    if !l.echo_enabled || l.cap_h == 0 { return }
+fn draw_echo_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayout) {
+    if !l.echo_enabled || l.cap_h == 0 { return; }
     let echo_cap_end = l.echo_cap_end.min(l.h);
     let right = l.right.min(l.w);
-    if l.echo_start >= echo_cap_end || l.left >= right { return }
+    if l.echo_start >= echo_cap_end || l.left >= right { return; }
 
-    let mut echo_layer: RgbaImage = ImageBuffer::from_pixel(l.w, l.h, Rgba([0, 0, 0, 0]));
+    let mut echo_pixmap = Pixmap::new(l.w, l.h).unwrap();
     let echo_config = create_echo_config(config);
-    draw_cap(&mut echo_layer, &echo_config, l.left, right, l.echo_start, echo_cap_end);
+    draw_cap(&mut echo_pixmap.as_mut(), &echo_config, l.left, right, l.echo_start, echo_cap_end);
 
     let echo_color = config.effect.echo_color;
     let a = (echo_color.a as u32 * config.effect.echo_opacity as u32 * config.global_opacity as u32 / 65025) as u8;
-    let px = Rgba([echo_color.r, echo_color.g, echo_color.b, a]);
-    let fill_end = l.cap_end.min(l.h);
-    for y in echo_cap_end..fill_end {
-        for x in l.left..right {
-            echo_layer.put_pixel(x, y, px);
-        }
+    let fill_color = Color::from_rgba8(echo_color.r, echo_color.g, echo_color.b, a);
+    let fill_h = l.cap_end.min(l.h).saturating_sub(echo_cap_end);
+    if fill_h > 0 {
+        let rect = Rect::from_xywh(l.left as f32, echo_cap_end as f32, (right - l.left) as f32, fill_h as f32).unwrap();
+        let mut paint = Paint::default();
+        paint.set_color(fill_color);
+        echo_pixmap.fill_rect(rect, &paint, Transform::identity(), None);
     }
-    for y in l.echo_start..fill_end {
-        for x in l.left..right {
-            let ep = echo_layer.get_pixel(x, y);
-            if ep[3] > 0 && img.get_pixel(x, y)[3] == 0 {
-                img.put_pixel(x, y, *ep);
+
+    // 合并 echo 层到主 pixmap（仅在主 pixmap 透明处绘制）
+    let pw = l.w as usize;
+    let y_end = l.cap_end.min(l.h) as usize;
+    let data = pixmap.data_mut();
+    let echo_data = echo_pixmap.data();
+    for y in l.echo_start as usize..y_end {
+        for x in l.left as usize..right as usize {
+            let i = (y * pw + x) * 4;
+            if echo_data[i + 3] > 0 && data[i + 3] == 0 {
+                data[i..i + 4].copy_from_slice(&echo_data[i..i + 4]);
             }
         }
     }
 }
 
-fn draw_cap_layer(img: &mut RgbaImage, config: &TailConfig, l: &RenderLayout) {
+fn draw_cap_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayout) {
     if l.cap_h > 0 {
-        draw_cap(img, config, l.left, l.right, l.cap_start, l.cap_end);
+        draw_cap(&mut pixmap.as_mut(), config, l.left, l.right, l.cap_start, l.cap_end);
     }
 }
 
-fn draw_body_layer(img: &mut RgbaImage, config: &TailConfig, l: &RenderLayout) {
+fn draw_body_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayout) {
     if l.body_h > 0 {
-        draw_body(img, config, l.left, l.right, l.body_start, l.body_h);
+        draw_body(&mut pixmap.as_mut(), config, l.left, l.right, l.body_start, l.body_h);
     }
 }
 
-
-
-/// 一维形态学腐蚀：对行/列上每个像素取其半径 radius 邻域内的最小值
-/// 边界处窗口截断（不镜像/不填充）
-fn erode_1d(buf: &mut [u8], length: usize, stride: usize, radius: u32) {
-    let r = radius as usize;
-    let mut tmp = vec![0u8; length];
-    for i in 0..length {
-        let lo = i.saturating_sub(r);
-        let hi = (i + r).min(length - 1);
-        let mut min_val = 255u8;
-        for j in lo..=hi {
-            let v = buf[j * stride];
-            if v < min_val {
-                min_val = v;
-            }
-        }
-        tmp[i] = min_val;
-    }
-    for i in 0..length {
-        buf[i * stride] = tmp[i];
-    }
-}
-
-/// 形态学腐蚀：分离式两遍（水平 + 垂直），时间复杂度 O(W×H)
-/// mask 中非零像素视为前景，腐蚀后前景收缩 radius 像素
-fn erode_mask(mask: &mut [u8], w: u32, h: u32, radius: u32) {
-    if radius == 0 { return; }
-    // 水平：每行独立腐蚀
-    for y in 0..h as usize {
-        let row_start = y * w as usize;
-        erode_1d(&mut mask[row_start..row_start + w as usize], w as usize, 1, radius);
-    }
-    // 垂直：每列独立腐蚀
-    for x in 0..w as usize {
-        erode_1d(&mut mask[x..], h as usize, w as usize, radius);
-    }
-}
-
-/// 边框渲染层：对合成图像中所有非透明像素的边缘做形态学腐蚀，
-/// 腐蚀差集即为边框区域，用边框颜色替换
-fn draw_border_layer(img: &mut RgbaImage, config: &TailConfig) {
+fn draw_border_layer(pixmap: &mut Pixmap, config: &TailConfig) {
     if !config.body.border_enabled || config.body.border_width == 0 { return; }
 
-    let w = img.width();
-    let h = img.height();
+    let w = pixmap.width();
+    let h = pixmap.height();
     let border_width = config.body.border_width;
-    let (br, bg, bb) = if config.body.border_match_body {
-        let bc = if config.body.independent_settings {
-            config.body.color
-        } else {
-            config.global_color
-        };
-        (bc.r, bc.g, bc.b)
-    } else {
-        let bc = config.body.border_color;
-        (bc.r, bc.g, bc.b)
-    };
+    let (br, bg, bb) = border_rgb(config);
 
-    // 1. 提取 alpha 通道作为二值 mask（>0 即前景）
+    let data = pixmap.data();
     let len = (w * h) as usize;
-    let mut mask: Vec<u8> = Vec::with_capacity(len);
-    for pixel in img.pixels() {
-        mask.push(if pixel[3] > 0 { 255 } else { 0 });
-    }
+    let mask: Vec<u8> = (0..len).map(|i| if data[i * 4 + 3] > 0 { 255 } else { 0 }).collect();
+    let orig_alpha: Vec<u8> = (0..len).map(|i| data[i * 4 + 3]).collect();
+    let _ = data; // 释放不可变借用，后面需要 data_mut
 
-    // 2. 形态学腐蚀：前景向内收缩 border_width 像素
     let mut eroded = mask.clone();
     erode_mask(&mut eroded, w, h, border_width);
 
-    // 3. 差集 = 边框区域：原 mask 非零 且 腐蚀后为零
-    //    同时根据透明度规则计算边框颜色
     let border_opacity = config.body.border_opacity;
     let independent = config.body.border_opacity_independent;
-
+    let data = pixmap.data_mut();
     for i in 0..len {
-        if mask[i] == 0 || eroded[i] != 0 {
-            continue;
-        }
-        let alpha = if independent {
-            border_opacity
-        } else {
-            // 非独立：透明度 = 被挤占像素的透明度
-            img.as_flat_samples().samples[i * 4 + 3]
-        };
-        let px = img.get_pixel_mut(i as u32 % w, i as u32 / w);
-        *px = Rgba([br, bg, bb, alpha]);
+        if mask[i] == 0 || eroded[i] != 0 { continue; }
+        let alpha = if independent { border_opacity } else { orig_alpha[i] };
+        data[i * 4] = br;
+        data[i * 4 + 1] = bg;
+        data[i * 4 + 2] = bb;
+        data[i * 4 + 3] = alpha;
     }
+}
+
+fn border_rgb(config: &TailConfig) -> (u8, u8, u8) {
+    let bc: RgbaColor = if config.body.border_match_body {
+        if config.body.independent_settings { config.body.color } else { config.global_color }
+    } else {
+        config.body.border_color
+    };
+    (bc.r, bc.g, bc.b)
+}
+
+/// tiny-skia 内部使用 premultiplied alpha，导出前需还原为 straight alpha
+fn pixmap_to_image(pixmap: Pixmap) -> RgbaImage {
+    let w = pixmap.width();
+    let h = pixmap.height();
+    let data = pixmap.data();
+    ImageBuffer::from_fn(w, h, |x, y| {
+        let i = ((y * w + x) * 4) as usize;
+        let [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
+        if a == 0 {
+            Rgba([0, 0, 0, 0])
+        } else {
+            // unpremultiply
+            let scale = 255.0 / a as f32;
+            Rgba([
+                (r as f32 * scale).round().min(255.0) as u8,
+                (g as f32 * scale).round().min(255.0) as u8,
+                (b as f32 * scale).round().min(255.0) as u8,
+                a,
+            ])
+        }
+    })
 }
 
 fn create_echo_config(config: &TailConfig) -> TailConfig {
