@@ -46,7 +46,10 @@ function toggleEcho() {
   if (isGradient.value) return
   const next = !config.effect.capEchoEnabled
   setEffectProp('capEchoEnabled', next)
-  if (!next) {
+  if (next) {
+    // 打开时使用整体颜色
+    setEffectProp('echoColor', { ...config.globalColor })
+  } else {
     resetEffectField('echoColor')
     resetEffectField('echoOpacity')
     resetEffectField('echoLength')
