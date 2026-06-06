@@ -16,17 +16,47 @@ const loadingThumbs = ref(false)
 const showSaveInput = ref(false)
 const newPresetName = ref('')
 const saveError = ref('')
+const overwriteConfirming = ref(false)
+let overwriteTimer: ReturnType<typeof setTimeout> | null = null
+
+function isDuplicateName(name: string) {
+  return presets.value.some(p => p.name === name)
+}
 
 async function handleSave() {
   const name = newPresetName.value.trim()
   if (!name) { saveError.value = '请输入预设名称'; return }
+
+  // 重名时需要二次确认覆盖
+  if (isDuplicateName(name)) {
+    if (overwriteConfirming.value) {
+      // 第二次点击，执行覆盖
+      if (overwriteTimer) { clearTimeout(overwriteTimer); overwriteTimer = null }
+      overwriteConfirming.value = false
+      await doSave(name)
+    } else {
+      // 第一次点击，进入确认状态
+      overwriteConfirming.value = true
+      saveError.value = ''
+      overwriteTimer = setTimeout(() => {
+        overwriteConfirming.value = false
+        overwriteTimer = null
+      }, 2000)
+    }
+    return
+  }
+
+  await doSave(name)
+}
+
+async function doSave(name: string) {
   try {
     await savePreset(name)
-    const added = presets.value[presets.value.length - 1]
+    const saved = presets.value.find(p => p.name === name)
     newPresetName.value = ''
     showSaveInput.value = false
     saveError.value = ''
-    if (added) renderThumbForPreset(added)
+    if (saved) renderThumbForPreset(saved)
   } catch (e: any) {
     saveError.value = e.message || String(e)
   }
@@ -128,7 +158,10 @@ onMounted(() => {
             placeholder="预设名称..."
             @keyup.enter="handleSave"
           />
-          <button class="footer-btn primary" @click="handleSave">保存</button>
+          <button
+            :class="['footer-btn', { confirming: overwriteConfirming }]"
+            @click="handleSave"
+          >{{ overwriteConfirming ? '确认覆盖？' : '保存' }}</button>
           <button class="footer-btn" @click="showSaveInput = false; saveError = ''">取消</button>
         </div>
         <p v-if="saveError" class="error-text">{{ saveError }}</p>
@@ -387,6 +420,14 @@ onMounted(() => {
 }
 .footer-btn.primary:hover {
   background: var(--accent-purple-light);
+}
+.footer-btn.confirming {
+  border-color: #ff4466;
+  color: #ff4466;
+  background: oklch(0.35 0.08 16 / 0.3);
+}
+.footer-btn.confirming:hover {
+  background: oklch(0.4 0.1 16 / 0.4);
 }
 .footer-btn.ghost {
   background: transparent;

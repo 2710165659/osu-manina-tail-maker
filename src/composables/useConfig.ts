@@ -73,20 +73,21 @@ export function useConfig() {
   }
 
   async function savePreset(name: string, presetConfig?: TailConfig) {
-    // 自动处理重名：原名称(1), 原名称(2), ...
-    let finalName = name
-    const existingNames = new Set(presets.value.map(p => p.name))
-    if (existingNames.has(finalName)) {
-      let i = 1
-      while (existingNames.has(`${name}(${i})`)) i++
-      finalName = `${name}(${i})`
+    const newConfig = JSON.parse(JSON.stringify(presetConfig || config))
+    const idx = presets.value.findIndex(p => p.name === name)
+
+    if (idx >= 0) {
+      // 覆盖已有预设（UI 层已做二次确认）
+      presets.value[idx].config = newConfig
+    } else {
+      // 新增预设
+      const newPreset: Preset = {
+        name,
+        config: newConfig,
+        builtin: false,
+      }
+      presets.value.push(newPreset)
     }
-    const newPreset: Preset = {
-      name: finalName,
-      config: JSON.parse(JSON.stringify(presetConfig || config)),
-      builtin: false,
-    }
-    presets.value.push(newPreset)
     await persistUserPresets()
   }
 
