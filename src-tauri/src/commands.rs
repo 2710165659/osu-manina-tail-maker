@@ -1,6 +1,7 @@
 use crate::config::{Preset, TailConfig, ValidationResult};
 use crate::preset;
 use crate::renderer;
+use crate::tools::image_parser;
 use base64::Engine;
 use image::ImageBuffer;
 use std::collections::hash_map::DefaultHasher;
@@ -215,6 +216,50 @@ pub fn render_preset_thumbnail(config: TailConfig) -> Result<String, String> {
         let _ = fs::create_dir_all(parent);
     }
     let _ = fs::write(&cache_path, &png_bytes);
+
+    Ok(base64::engine::general_purpose::STANDARD.encode(&png_bytes))
+}
+
+/// 解析图片为预设配置
+/// 返回 (配置, 警告列表)
+#[tauri::command]
+pub fn parse_image_to_preset(image_path: String) -> Result<(TailConfig, Vec<String>), String> {
+    let path = PathBuf::from(&image_path);
+    if !path.exists() {
+        return Err("图片文件不存在".to_string());
+    }
+
+    let result = image_parser::parse_image(&path)
+        .map_err(|e| format!("解析失败: {}", e))?;
+
+    Ok((result.config, result.warnings))
+}
+
+/// 读取图片顶部 500px 并返回 base64 编码的 PNG
+#[tauri::command]
+pub fn get_image_preview_top(image_path: String) -> Result<String, String> {
+    let path = PathBuf::from(&image_path);
+    if !path.exists() {
+        return Err("图片文件不存在".to_string());
+    }
+
+    let img = image::open(&path)
+        .map_err(|e| format!("读取图片失败: {}", e))?;
+    let rgba = img.to_rgba8();
+    let (w, h) = rgba.dimensions();
+
+    // 截取顶部 500px
+    let crop_h = h.min(500);
+    let cropped = image::ImageBuffer::from_fn(w, crop_h, |x, y| {
+        *rgba.get_pixel(x, y)
+    });
+
+    // 编码为 PNG
+    let mut png_bytes = Vec::new();
+    let mut cursor = Cursor::new(&mut png_bytes);
+    image::DynamicImage::ImageRgba8(cropped)
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| format!("PNG 编码失败: {}", e))?;
 
     Ok(base64::engine::general_purpose::STANDARD.encode(&png_bytes))
 }

@@ -72,7 +72,7 @@ export function useConfig() {
     await updatePreview()
   }
 
-  async function savePreset(name: string) {
+  async function savePreset(name: string, presetConfig?: TailConfig) {
     // 自动处理重名：原名称(1), 原名称(2), ...
     let finalName = name
     const existingNames = new Set(presets.value.map(p => p.name))
@@ -83,7 +83,7 @@ export function useConfig() {
     }
     const newPreset: Preset = {
       name: finalName,
-      config: JSON.parse(JSON.stringify(config)),
+      config: JSON.parse(JSON.stringify(presetConfig || config)),
       builtin: false,
     }
     presets.value.push(newPreset)

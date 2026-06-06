@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 import ExportBar from './ExportBar.vue'
 import PresetPanel from './PresetPanel.vue'
+import ImportPanel from './ImportPanel.vue'
 
 const { config, previewBase64, previewLoading, resetConfig } = useConfig()
 
@@ -31,7 +32,6 @@ const bgMenuOpen = ref(false)
 function selectBg(m: BgMode) { bgMode.value = m; bgMenuOpen.value = false; paint() }
 function toggleBgMenu() { bgMenuOpen.value = !bgMenuOpen.value }
 
-// 弹出面板
 const showPresetPanel = ref(false)
 const showToolboxPanel = ref(false)
 const showImportPanel = ref(false)
@@ -88,7 +88,6 @@ function drawMain() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cw.value, ch.value)
 
-  // 外部区域
   ctx.fillStyle = '#070810'
   ctx.fillRect(0, 0, cw.value, ch.value)
 
@@ -98,7 +97,6 @@ function drawMain() {
   const dx = (cw.value - dw) / 2 + pan.value.x
   const dy = (ch.value - dh) / 2 + pan.value.y
 
-  // 图片区域背景
   const bm = bgMode.value
   if (bm === 'white') {
     ctx.fillStyle = '#ffffff'; ctx.fillRect(dx, dy, dw, dh)
@@ -107,7 +105,6 @@ function drawMain() {
   } else if (bm === 'green') {
     ctx.fillStyle = '#00ff00'; ctx.fillRect(dx, dy, dw, dh)
   } else {
-    // dark70 (default)
     drawPSGrid(ctx, dx, dy, dw, dh)
     ctx.save()
     ctx.beginPath(); ctx.rect(dx, dy, dw, dh); ctx.clip()
@@ -119,7 +116,6 @@ function drawMain() {
   if (dw > 0.2 && dh > 0.2) ctx.drawImage(bitmap, dx, dy, dw, dh)
 }
 
-// 模拟 PS 透明网格
 function drawPSGrid(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
   const sz = 10
   ctx.save()
@@ -145,7 +141,6 @@ function drawAnno() {
   const dw = bw.value * scale; const dh = bh.value * scale
   const dx = (cw.value - dw) / 2 + pan.value.x
   const dy = (ch.value - dh) / 2 + pan.value.y
-  // 直接按位图像素 × 缩放计算，不依赖全图高度
   const throwY0 = dy
   const throwY1 = dy + config.throwLength * s.value
   const capDivisor = config.cap.shape === 'gradient' ? 100 : 200
@@ -163,14 +158,12 @@ function drawAnno() {
   ctx.font = '10px "JetBrains Mono", monospace'
   ctx.textBaseline = 'middle'
 
-  const lx = Math.max(2, dx - 42) // 左侧标注线 x 位置
+  const lx = Math.max(2, dx - 42)
 
-  // === 左侧竖线 1：投的长度（透明区域）===
   if (config.throwLength > 0 && throwY1 > throwY0 + 4) {
     const x1 = lx
     ctx.strokeStyle = 'rgba(255,102,170,0.6)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.moveTo(x1, throwY0); ctx.lineTo(x1, throwY1); ctx.stroke()
-    // 端点
     drawDot(ctx, x1, throwY0, '#ff66aa')
     drawDot(ctx, x1, throwY1, '#ff66aa')
     ctx.textAlign = 'right'
@@ -178,7 +171,6 @@ function drawAnno() {
     ctx.textAlign = 'start'
   }
 
-  // === 左侧竖线 2：Echo 区域（如果开启）===
   if (echoEnabled && echoTotalHpx > 0) {
     const x2 = lx + 18
     ctx.strokeStyle = 'rgba(183,108,241,0.3)'; ctx.setLineDash([]); ctx.lineWidth = 1.5
@@ -190,7 +182,6 @@ function drawAnno() {
     ctx.textAlign = 'start'
   }
 
-  // === 左侧竖线 3：Cap 区域（Cap 起始 → Cap 结束）===
   const capH = capEndY - capStartY
   if (capH > 4 && capHpx > 0) {
     const x3 = lx + (echoEnabled ? 36 : 18)
@@ -203,7 +194,6 @@ function drawAnno() {
     ctx.textAlign = 'start'
   }
 
-  // === 底部重复提示 ===
   if (dh > 0) {
     const botY = dy + dh
     ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.setLineDash([2,6]); ctx.lineWidth = 1
@@ -215,7 +205,6 @@ function drawAnno() {
     ctx.textAlign = 'start'; ctx.textBaseline = 'middle'
   }
 
-  // 右下角：分辨率 + 缩放
   ctx.font = '12px "JetBrains Mono", monospace'
   const t = `分辨率：${config.image.width}×${config.image.height}  缩放：${zoom.value}%`
   const m = ctx.measureText(t)
@@ -311,7 +300,6 @@ watch([s, cw, ch], paint, { flush: 'post' })
     </div>
     <ExportBar />
 
-    <!-- 预设面板弹出层 -->
     <PresetPanel v-if="showPresetPanel" @close="showPresetPanel = false" />
 
     <!-- 工具箱面板 -->
@@ -330,19 +318,7 @@ watch([s, cw, ch], paint, { flush: 'post' })
     </div>
 
     <!-- 导入图片面板 -->
-    <div v-if="showImportPanel" class="panel-overlay" @click.self="showImportPanel = false">
-      <div class="overlay-panel">
-        <div class="overlay-header">
-          <span class="overlay-title">导入图片</span>
-          <button class="close-btn" @click="showImportPanel = false">
-            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
-        </div>
-        <div class="overlay-body">
-          <div class="empty-hint">暂无内容</div>
-        </div>
-      </div>
-    </div>
+    <ImportPanel v-if="showImportPanel" @close="showImportPanel = false" />
   </div>
 </template>
 
@@ -397,7 +373,6 @@ watch([s, cw, ch], paint, { flush: 'post' })
   background: oklch(0.4 0.1 16 / 0.4);
 }
 
-/* 通用弹出面板 */
 .panel-overlay {
   position: fixed;
   inset: 0;
@@ -428,12 +403,12 @@ watch([s, cw, ch], paint, { flush: 'post' })
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 .overlay-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: 0.3px;
@@ -468,10 +443,6 @@ watch([s, cw, ch], paint, { flush: 'post' })
   font-size: 13px;
 }
 
-.zoom-row { display:flex; align-items:center; gap:4px }
-.zi { width:52px; padding:3px 4px; text-align:center; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; font-family:'JetBrains Mono',monospace; outline:none }
-.zi:focus { border-color:var(--accent-purple) }
-.zu { font-size:11px; color:var(--text-muted) }
 .st { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted) }
 .dot { width:6px; height:6px; border-radius:50% }
 .dot.ld { background:var(--accent-purple); animation:pulse 1.2s ease-in-out infinite }

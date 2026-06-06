@@ -2,6 +2,7 @@ mod commands;
 mod config;
 mod preset;
 mod renderer;
+mod tools;
 
 use commands::*;
 
@@ -28,6 +29,8 @@ pub fn run() {
             save_user_presets,
             render_preset_thumbnail,
             open_url,
+            parse_image_to_preset,
+            get_image_preview_top,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
