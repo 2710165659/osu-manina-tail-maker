@@ -3,24 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 import { rgbaToHex, hexToRgba } from '../../types/config'
 
-const { config, setBodyProp, setEffectProp, resetBodyField, resetEffectField } = useConfig()
-
-// 边框颜色
-const bHex = ref(rgbaToHex(config.body.borderColor))
-watch(() => config.body.borderColor, (c) => { bHex.value = rgbaToHex(c) })
-function applyBorderHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.body.borderColor = hexToRgba('#' + clean, config.body.borderColor.a)
-}
-const borderOpacityModel = computed({
-  get: () => config.body.borderOpacity,
-  set: (v: number) => setBodyProp('borderOpacity', Math.max(0, Math.min(255, v))),
-})
-const borderOpacityPct = computed(() => Math.round((config.body.borderOpacity / 255) * 100))
-const borderWidthModel = computed({
-  get: () => config.body.borderWidth,
-  set: (v: number) => setBodyProp('borderWidth', Math.max(1, v)),
-})
+const { config, setEffectProp, resetEffectField } = useConfig()
 
 // 外发光
 const glowHex = ref(rgbaToHex(config.effect.glowColor))
@@ -102,47 +85,6 @@ function toggleEcho() {
       </svg>
       效果
     </h3>
-
-    <!-- 边框 -->
-    <div class="subsection">
-      <div class="toggle-row">
-        <label class="field-label toggle-label">内边框</label>
-        <div class="toggle-right">
-          <button :class="['toggle', { on: config.body.borderEnabled }]"
-            @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); resetBodyField('borderColor'); resetBodyField('borderOpacity'); resetBodyField('borderOpacityIndependent'); resetBodyField('borderWidth') }">
-            <span class="toggle-knob"></span>
-          </button>
-        </div>
-      </div>
-
-      <div v-if="config.body.borderEnabled" class="sub-settings fade-in">
-        <div class="sub-label-row">
-          <span class="sub-label">颜色</span>
-        </div>
-        <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.body.borderColor)" class="color-picker"
-            @input="applyBorderHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="bHex" class="hex-input" maxlength="7" @change="applyBorderHex(bHex)"
-            @blur="applyBorderHex(bHex)" />
-        </div>
-
-        <div class="opacity-label-row">
-          <span class="sub-label">透明度</span>
-        </div>
-        <div class="slider-row">
-          <button :class="['opacity-independent-btn', { on: config.body.borderOpacityIndependent }]"
-            @click="setBodyProp('borderOpacityIndependent', !config.body.borderOpacityIndependent)">独立</button>
-          <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider"
-            :disabled="!config.body.borderOpacityIndependent" />
-          <span class="slider-val">{{ borderOpacityPct }}%</span>
-        </div>
-
-        <div class="other-label">粗细 <span class="unit">px</span></div>
-        <div class="input-wrap">
-          <input v-model.number="borderWidthModel" type="number" min="1" class="num-input narrow" />
-        </div>
-      </div>
-    </div>
 
     <!-- 暗化重复 -->
     <div class="subsection">

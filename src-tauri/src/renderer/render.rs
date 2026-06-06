@@ -1,6 +1,7 @@
 use crate::renderer::cap::draw_cap_layer;
 use crate::renderer::body::draw_body_layer;
-use crate::renderer::effects::{draw_echo_layer, draw_border_layer, draw_glow_layer};
+use crate::renderer::border::draw_border_layer;
+use crate::renderer::effects::{draw_echo_layer, draw_glow_layer};
 
 use crate::config::{CapShape, TailConfig};
 use image::{ImageBuffer, Rgba, RgbaImage};
