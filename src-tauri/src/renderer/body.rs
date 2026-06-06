@@ -1,15 +1,12 @@
 use crate::config::{RgbaColor, TailConfig};
 use tiny_skia::*;
 
-pub fn draw_body(
-    pixmap: &mut PixmapMut,
-    config: &TailConfig,
-    left: u32,
-    right: u32,
-    y_start: u32,
-    body_height: u32,
-) {
-    if body_height == 0 || left >= right { return; }
+use crate::renderer::render::RenderLayout;
+
+pub fn draw_body_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayout) {
+    if l.body_h == 0 { return; }
+    let (left, right, y_start, body_height) = (l.left, l.right, l.body_start, l.body_h);
+    if left >= right { return; }
     let (fc, fo) = if config.body.independent_settings {
         (config.body.color, config.body.opacity)
     } else {
@@ -18,7 +15,7 @@ pub fn draw_body(
     let rect = Rect::from_xywh(left as f32, y_start as f32, (right - left) as f32, body_height as f32).unwrap();
     let mut paint = Paint::default();
     paint.set_color(solid_color(fc, fo));
-    pixmap.fill_rect(rect, &paint, Transform::identity(), None);
+    pixmap.as_mut().fill_rect(rect, &paint, Transform::identity(), None);
 }
 
 fn solid_color(c: RgbaColor, opacity: u8) -> Color {

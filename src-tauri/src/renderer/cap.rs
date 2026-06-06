@@ -1,24 +1,21 @@
 use crate::config::{CapShape, RgbaColor, TailConfig};
 use tiny_skia::*;
 
-pub fn draw_cap(
-    pixmap: &mut PixmapMut,
-    config: &TailConfig,
-    left: u32,
-    right: u32,
-    y_start: u32,
-    y_end: u32,
-) {
-    if y_start >= y_end || left >= right { return; }
+use crate::renderer::render::RenderLayout;
+
+pub fn draw_cap_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayout) {
+    if l.cap_h == 0 { return; }
+    let (left, right, y_start, y_end) = (l.left, l.right, l.cap_start, l.cap_end);
+    if left >= right { return; }
 
     let color = if config.cap.independent_settings { config.cap.color } else { config.global_color };
     let opacity = if config.cap.independent_settings { config.cap.opacity } else { config.global_opacity };
 
     match config.cap.shape {
-        CapShape::Rect => draw_rect(pixmap, left, right, y_start, y_end, color, opacity),
-        CapShape::Ball => draw_ball(pixmap, left, right, y_start, y_end, color, opacity),
-        CapShape::Diamond => draw_diamond(pixmap, left, right, y_start, y_end, color, opacity),
-        CapShape::Gradient => draw_gradient(pixmap, left, right, y_start, y_end, color, opacity),
+        CapShape::Rect => draw_rect(&mut pixmap.as_mut(), left, right, y_start, y_end, color, opacity),
+        CapShape::Ball => draw_ball(&mut pixmap.as_mut(), left, right, y_start, y_end, color, opacity),
+        CapShape::Diamond => draw_diamond(&mut pixmap.as_mut(), left, right, y_start, y_end, color, opacity),
+        CapShape::Gradient => draw_gradient(&mut pixmap.as_mut(), left, right, y_start, y_end, color, opacity),
     }
 }
 
