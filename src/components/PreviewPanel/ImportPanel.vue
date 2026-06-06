@@ -147,8 +147,8 @@ function colorStr(c: { r: number; g: number; b: number }) {
             <!-- 未上传时提示 -->
             <div v-if="!parsedConfig && !loading && !error" class="info-notice">
               <p>请先上传图片以进行解析。</p>
-              <p>解析效果可能不完美，尤其是渐变、发光等效果无法被正确识别。</p>
-              <p>本工具的图片处理功能有限，复杂处理建议使用 Photoshop 等专业软件。</p>
+              <p>只能解析图片尺寸和整体外观。</p>
+              <p>边框，球皮检测效果不是很好，需手动调整。</p>
             </div>
 
             <!-- 加载中 -->
@@ -196,7 +196,7 @@ function colorStr(c: { r: number; g: number; b: number }) {
               <div class="info-section">
                 <div class="sec-title">顶端</div>
                 <div class="kv"><span class="k">形状</span><span class="v">{{ formatShape(parsedConfig.cap.shape)
-                    }}</span></div>
+                }}</span></div>
                 <div class="kv"><span class="k">缩放</span><span class="v">{{ parsedConfig.cap.scale }}%</span></div>
               </div>
             </template>

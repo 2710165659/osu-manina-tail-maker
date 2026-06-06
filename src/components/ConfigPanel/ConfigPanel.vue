@@ -22,29 +22,31 @@ function openGitHub() {
         <svg class="logo-svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
           <defs>
             <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28">
-              <stop offset="0%" stop-color="#b76cf1"/>
-              <stop offset="100%" stop-color="#ff66aa"/>
+              <stop offset="0%" stop-color="#b76cf1" />
+              <stop offset="100%" stop-color="#ff66aa" />
             </linearGradient>
             <linearGradient id="logoBody" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#b76cf1" stop-opacity="0.6"/>
-              <stop offset="100%" stop-color="#b76cf1" stop-opacity="0.25"/>
+              <stop offset="0%" stop-color="#b76cf1" stop-opacity="0.6" />
+              <stop offset="100%" stop-color="#b76cf1" stop-opacity="0.25" />
             </linearGradient>
           </defs>
           <!-- Body rect -->
-          <rect x="8" y="10" width="12" height="16" rx="2" stroke="url(#logoGrad)" stroke-width="1.2" fill="url(#logoBody)"/>
+          <rect x="8" y="10" width="12" height="16" rx="2" stroke="url(#logoGrad)" stroke-width="1.2"
+            fill="url(#logoBody)" />
           <!-- Cap: upper half-ellipse -->
-          <path d="M8 12 A6 6 0 0 1 20 12" stroke="url(#logoGrad)" stroke-width="1.5" fill="url(#logoGrad)" fill-opacity="0.35"/>
+          <path d="M8 12 A6 6 0 0 1 20 12" stroke="url(#logoGrad)" stroke-width="1.5" fill="url(#logoGrad)"
+            fill-opacity="0.35" />
           <!-- Note lanes hint -->
-          <line x1="3" y1="4" x2="25" y2="4" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.4"/>
-          <line x1="3" y1="6" x2="25" y2="6" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.25"/>
-          <line x1="3" y1="24" x2="25" y2="24" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.25"/>
-          <line x1="3" y1="26" x2="25" y2="26" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.4"/>
+          <line x1="3" y1="4" x2="25" y2="4" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.4" />
+          <line x1="3" y1="6" x2="25" y2="6" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.25" />
+          <line x1="3" y1="24" x2="25" y2="24" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.25" />
+          <line x1="3" y1="26" x2="25" y2="26" stroke="url(#logoGrad)" stroke-width="0.4" opacity="0.4" />
           <!-- Hit marker -->
-          <circle cx="14" cy="5" r="1.5" fill="#ff66aa" opacity="0.7"/>
+          <circle cx="14" cy="5" r="1.5" fill="#ff66aa" opacity="0.7" />
         </svg>
         <div class="logo-text-group">
           <span class="logo-title">Tail Maker</span>
-          <span class="logo-subtitle">osu!mania 面皮生成器</span>
+          <span class="logo-subtitle">osu!mania 投皮生成器</span>
         </div>
         <span class="github-link" @click="openGitHub" title="GitHub">
           <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
@@ -54,7 +56,7 @@ function openGitHub() {
               -3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82
               .64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08
               2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01
-              1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+              1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
           </svg>
         </span>
       </div>
@@ -90,8 +92,10 @@ function openGitHub() {
   flex-direction: column;
   overflow: visible;
   position: relative;
-  z-index: 10001; /* 高于 body::before 的 9999，确保 tooltip 不被遮挡 */
+  z-index: 10001;
+  /* 高于 body::before 的 9999，确保 tooltip 不被遮挡 */
 }
+
 /* Subtle side glow on the panel edge */
 .config-panel::after {
   content: '';
@@ -100,16 +104,14 @@ function openGitHub() {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    var(--accent-purple) 15%,
-    transparent 30%,
-    var(--accent-pink) 60%,
-    transparent 80%,
-    var(--accent-purple) 95%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg,
+      transparent 0%,
+      var(--accent-purple) 15%,
+      transparent 30%,
+      var(--accent-pink) 60%,
+      transparent 80%,
+      var(--accent-purple) 95%,
+      transparent 100%);
   opacity: 0.3;
   pointer-events: none;
 }
@@ -120,21 +122,25 @@ function openGitHub() {
   flex-shrink: 0;
   background: linear-gradient(180deg, rgba(183, 108, 241, 0.03) 0%, transparent 100%);
 }
+
 .app-logo {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
 .logo-svg {
   color: var(--accent-purple);
   filter: drop-shadow(0 0 8px rgba(183, 108, 241, 0.5));
   flex-shrink: 0;
 }
+
 .logo-text-group {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
+
 .github-link {
   color: var(--text-muted);
   display: flex;
@@ -144,9 +150,11 @@ function openGitHub() {
   margin-left: auto;
   flex-shrink: 0;
 }
+
 .github-link:hover {
   color: var(--text-primary);
 }
+
 .logo-title {
   font-size: 18px;
   font-weight: 700;
@@ -157,6 +165,7 @@ function openGitHub() {
   background-clip: text;
   line-height: 1.2;
 }
+
 .logo-subtitle {
   font-size: 10px;
   color: var(--text-muted);
@@ -181,13 +190,20 @@ function openGitHub() {
   transition: opacity 0.35s ease-out, transform 0.35s ease-out;
   transition-delay: calc(var(--i, 0) * 60ms + 50ms);
 }
+
 .section-wrapper.visible {
   opacity: 1;
   transform: translateX(0);
 }
 
-.panel-scroll::-webkit-scrollbar { width: 4px; }
-.panel-scroll::-webkit-scrollbar-track { background: transparent; }
+.panel-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .panel-scroll::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 2px;
