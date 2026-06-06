@@ -26,6 +26,7 @@ fn to_color(c: RgbaColor, opacity: u8) -> Color {
 
 fn solid_paint(c: RgbaColor, opacity: u8) -> Paint<'static> {
     let mut paint = Paint::default();
+    paint.blend_mode = BlendMode::Source;
     paint.set_color(to_color(c, opacity));
     paint.anti_alias = true;
     paint
@@ -90,6 +91,7 @@ fn draw_gradient(pixmap: &mut PixmapMut, left: u32, right: u32, y_start: u32, y_
     ).unwrap();
 
     let mut paint = Paint::default();
+    paint.blend_mode = BlendMode::Source;
     paint.shader = gradient;
     paint.anti_alias = false;
 

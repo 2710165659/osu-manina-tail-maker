@@ -22,6 +22,7 @@ pub fn draw_echo_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayou
     if fill_h > 0 {
         let rect = Rect::from_xywh(l.left as f32, echo_cap_end as f32, (right - l.left) as f32, fill_h as f32).unwrap();
         let mut paint = Paint::default();
+        paint.blend_mode = BlendMode::Source;
         paint.set_color(fill_color);
         echo_pixmap.fill_rect(rect, &paint, Transform::identity(), None);
     }

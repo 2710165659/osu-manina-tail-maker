@@ -14,6 +14,7 @@ pub fn draw_body_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayou
     };
     let rect = Rect::from_xywh(left as f32, y_start as f32, (right - left) as f32, body_height as f32).unwrap();
     let mut paint = Paint::default();
+    paint.blend_mode = BlendMode::Source;
     paint.set_color(solid_color(fc, fo));
     pixmap.as_mut().fill_rect(rect, &paint, Transform::identity(), None);
 }
