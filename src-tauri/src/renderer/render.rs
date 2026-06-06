@@ -1,10 +1,11 @@
 use crate::renderer::cap::draw_cap_layer;
 use crate::renderer::body::draw_body_layer;
-use crate::renderer::effects::{draw_echo_layer, draw_border_layer};
+use crate::renderer::effects::{draw_echo_layer, draw_border_layer, draw_glow_layer};
+use crate::renderer::gpu::{detect_gpu_backend, create_surface};
 
 use crate::config::{CapShape, TailConfig};
 use image::{ImageBuffer, Rgba, RgbaImage};
-use tiny_skia::*;
+use skia_safe::Surface;
 
 pub const PREVIEW_MAX_ROWS: u32 = 500;
 
@@ -45,24 +46,43 @@ impl RenderLayout {
 
 pub fn render(config: &TailConfig) -> RgbaImage {
     let layout = RenderLayout::new(config);
-    let mut pixmap = Pixmap::new(layout.w, layout.h).unwrap();
+    let backend = detect_gpu_backend();
+    let mut surface = create_surface(layout.w as i32, layout.h as i32, &backend)
+        .expect("Failed to create surface");
 
-    draw_echo_layer(&mut pixmap, config, &layout);
-    draw_cap_layer(&mut pixmap, config, &layout);
-    draw_body_layer(&mut pixmap, config, &layout);
-    draw_border_layer(&mut pixmap, config);
+    let canvas = surface.canvas();
+    canvas.clear(skia_safe::Color::TRANSPARENT);
 
-    pixmap_to_image(pixmap)
+    draw_echo_layer(canvas, config, &layout);
+    draw_cap_layer(canvas, config, &layout);
+    draw_body_layer(canvas, config, &layout);
+    draw_border_layer(&mut surface, config);
+    draw_glow_layer(&mut surface, config);
+
+    surface_to_image(&mut surface)
 }
 
-/// tiny-skia 内部使用 premultiplied alpha，导出前需还原为 straight alpha
-fn pixmap_to_image(pixmap: Pixmap) -> RgbaImage {
-    let w = pixmap.width();
-    let h = pixmap.height();
-    let data = pixmap.data();
+fn surface_to_image(surface: &mut Surface) -> RgbaImage {
+    let image = surface.image_snapshot();
+    let (w, h) = (image.width() as u32, image.height() as u32);
+
+    let info = skia_safe::ImageInfo::new(
+        (w as i32, h as i32),
+        skia_safe::ColorType::RGBA8888,
+        skia_safe::AlphaType::Premul,
+        None,
+    );
+
+    let mut pixels = vec![0u8; (w * h * 4) as usize];
+    image.read_pixels(&info, &mut pixels, (w * 4) as usize, (0, 0), skia_safe::image::CachingHint::Allow);
+
     ImageBuffer::from_fn(w, h, |x, y| {
         let i = ((y * w + x) * 4) as usize;
-        let [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
+        let r = pixels[i];
+        let g = pixels[i + 1];
+        let b = pixels[i + 2];
+        let a = pixels[i + 3];
+
         if a == 0 {
             Rgba([0, 0, 0, 0])
         } else {

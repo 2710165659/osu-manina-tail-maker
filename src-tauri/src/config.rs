@@ -70,6 +70,20 @@ pub struct EffectConfig {
     pub echo_opacity: u8,
     /// 重复长度
     pub echo_length: u32,
+    /// 外发光开关
+    pub glow_enabled: bool,
+    /// 发光颜色
+    pub glow_color: RgbaColor,
+    /// 发光透明度
+    pub glow_opacity: u8,
+    /// 发光偏移X
+    pub glow_dx: i32,
+    /// 发光偏移Y
+    pub glow_dy: i32,
+    /// 发光大小（模糊半径）
+    pub glow_size: u32,
+    /// 发光扩展（膨胀半径）
+    pub glow_spread: u32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -134,6 +148,13 @@ impl TailConfig {
                 echo_color: RgbaColor::GREY,
                 echo_opacity: 76,
                 echo_length: 50,
+                glow_enabled: false,
+                glow_color: RgbaColor { r: 144, g: 238, b: 144, a: 255 },
+                glow_opacity: 180,
+                glow_dx: 0,
+                glow_dy: 0,
+                glow_size: 8,
+                glow_spread: 4,
             },
             global_opacity: 255,
         }

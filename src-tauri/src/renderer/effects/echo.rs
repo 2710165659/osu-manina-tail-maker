@@ -1,45 +1,47 @@
 //! 暗化重复效果
 use crate::config::TailConfig;
-use tiny_skia::*;
+use skia_safe::{Canvas, Paint, Color, Rect, BlendMode};
 use super::super::cap::draw_cap_layer;
 use crate::renderer::render::RenderLayout;
 
-pub fn draw_echo_layer(pixmap: &mut Pixmap, config: &TailConfig, l: &RenderLayout) {
+pub fn draw_echo_layer(canvas: &Canvas, config: &TailConfig, l: &RenderLayout) {
     if !l.echo_enabled || l.cap_h == 0 { return; }
     let echo_cap_end = l.echo_cap_end.min(l.h);
     let right = l.right.min(l.w);
     if l.echo_start >= echo_cap_end || l.left >= right { return; }
 
-    let mut echo_pixmap = Pixmap::new(l.w, l.h).unwrap();
+    let mut echo_surface = skia_safe::surfaces::raster_n32_premul((l.w as i32, l.h as i32))
+        .expect("Failed to create echo surface");
+    let echo_canvas = echo_surface.canvas();
+    echo_canvas.clear(Color::TRANSPARENT);
+
     let echo_config = create_echo_config(config);
-    let echo_layout = RenderLayout { cap_start: l.echo_start, cap_end: echo_cap_end, cap_h: echo_cap_end - l.echo_start, left: l.left, right, ..*l };
-    draw_cap_layer(&mut echo_pixmap, &echo_config, &echo_layout);
+    let echo_layout = RenderLayout {
+        cap_start: l.echo_start,
+        cap_end: echo_cap_end,
+        cap_h: echo_cap_end - l.echo_start,
+        left: l.left,
+        right,
+        ..*l
+    };
+    draw_cap_layer(echo_canvas, &echo_config, &echo_layout);
 
     let echo_color = config.effect.echo_color;
     let a = (echo_color.a as u32 * config.effect.echo_opacity as u32 * config.global_opacity as u32 / 65025) as u8;
-    let fill_color = Color::from_rgba8(echo_color.r, echo_color.g, echo_color.b, a);
+    let fill_color = Color::from_argb(a, echo_color.r, echo_color.g, echo_color.b);
     let fill_h = l.cap_end.min(l.h).saturating_sub(echo_cap_end);
     if fill_h > 0 {
-        let rect = Rect::from_xywh(l.left as f32, echo_cap_end as f32, (right - l.left) as f32, fill_h as f32).unwrap();
+        let rect = Rect::from_xywh(l.left as f32, echo_cap_end as f32, (right - l.left) as f32, fill_h as f32);
         let mut paint = Paint::default();
-        paint.blend_mode = BlendMode::Source;
+        paint.set_blend_mode(BlendMode::Src);
         paint.set_color(fill_color);
-        echo_pixmap.fill_rect(rect, &paint, Transform::identity(), None);
+        echo_canvas.draw_rect(rect, &paint);
     }
 
-    // 合并 echo 层到主 pixmap（仅在主 pixmap 透明处绘制）
-    let pw = l.w as usize;
-    let y_end = l.cap_end.min(l.h) as usize;
-    let data = pixmap.data_mut();
-    let echo_data = echo_pixmap.data();
-    for y in l.echo_start as usize..y_end {
-        for x in l.left as usize..right as usize {
-            let i = (y * pw + x) * 4;
-            if echo_data[i + 3] > 0 && data[i + 3] == 0 {
-                data[i..i + 4].copy_from_slice(&echo_data[i..i + 4]);
-            }
-        }
-    }
+    let echo_image = echo_surface.image_snapshot();
+    let mut paint = Paint::default();
+    paint.set_blend_mode(BlendMode::DstOver);
+    canvas.draw_image(&echo_image, (0, 0), Some(&paint));
 }
 
 fn create_echo_config(config: &TailConfig) -> TailConfig {

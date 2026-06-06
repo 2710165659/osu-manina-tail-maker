@@ -22,6 +22,50 @@ const borderWidthModel = computed({
   set: (v: number) => setBodyProp('borderWidth', Math.max(1, v)),
 })
 
+// 外发光
+const glowHex = ref(rgbaToHex(config.effect.glowColor))
+watch(() => config.effect.glowColor, (c) => { glowHex.value = rgbaToHex(c) })
+function applyGlowHex(v: string) {
+  const clean = v.replace('#', '').trim()
+  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.effect.glowColor = hexToRgba('#' + clean, config.effect.glowColor.a)
+}
+const glowOpacityModel = computed({
+  get: () => config.effect.glowOpacity,
+  set: (v: number) => setEffectProp('glowOpacity', Math.max(0, Math.min(255, v))),
+})
+const glowOpacityPct = computed(() => Math.round((config.effect.glowOpacity / 255) * 100))
+const glowDxModel = computed({
+  get: () => config.effect.glowDx,
+  set: (v: number) => setEffectProp('glowDx', Math.max(-50, Math.min(50, v))),
+})
+const glowDyModel = computed({
+  get: () => config.effect.glowDy,
+  set: (v: number) => setEffectProp('glowDy', Math.max(-50, Math.min(50, v))),
+})
+const glowSizeModel = computed({
+  get: () => config.effect.glowSize,
+  set: (v: number) => setEffectProp('glowSize', Math.max(0, Math.min(100, v))),
+})
+const glowSpreadModel = computed({
+  get: () => config.effect.glowSpread,
+  set: (v: number) => setEffectProp('glowSpread', Math.max(0, Math.min(100, v))),
+})
+
+function toggleGlow() {
+  const next = !config.effect.glowEnabled
+  setEffectProp('glowEnabled', next)
+  if (next) {
+    setEffectProp('glowColor', { r: 144, g: 238, b: 144, a: 255 })
+  } else {
+    resetEffectField('glowColor')
+    resetEffectField('glowOpacity')
+    resetEffectField('glowDx')
+    resetEffectField('glowDy')
+    resetEffectField('glowSize')
+    resetEffectField('glowSpread')
+  }
+}
+
 // 暗化重复
 const echoHex = ref(rgbaToHex(config.effect.echoColor))
 watch(() => config.effect.echoColor, (c) => { echoHex.value = rgbaToHex(c) })
@@ -70,7 +114,7 @@ function toggleEcho() {
     <!-- 边框 -->
     <div class="subsection">
       <div class="toggle-row">
-        <label class="field-label toggle-label">边框</label>
+        <label class="field-label toggle-label">内边框</label>
         <div class="toggle-right">
           <button :class="['toggle', { on: config.body.borderEnabled }]" @click="() => { const next = !config.body.borderEnabled; setBodyProp('borderEnabled', next); resetBodyField('borderColor'); resetBodyField('borderOpacity'); resetBodyField('borderOpacityIndependent'); resetBodyField('borderWidth') }">
             <span class="toggle-knob"></span>
@@ -99,6 +143,54 @@ function toggleEcho() {
         <div class="other-label">粗细 <span class="unit">px</span></div>
         <div class="input-wrap">
           <input v-model.number="borderWidthModel" type="number" min="1" class="num-input narrow" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 外发光 -->
+    <div class="subsection">
+      <div class="toggle-row">
+        <label class="field-label toggle-label">外发光</label>
+        <div class="toggle-right">
+          <button :class="['toggle', { on: config.effect.glowEnabled }]" @click="toggleGlow">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="config.effect.glowEnabled" class="sub-settings fade-in">
+        <div class="sub-label-row">
+          <span class="sub-label">颜色</span>
+        </div>
+        <div class="color-row">
+          <input type="color" :value="rgbaToHex(config.effect.glowColor)" class="color-picker" @input="applyGlowHex(($event.target as HTMLInputElement).value)" />
+          <input v-model="glowHex" class="hex-input" maxlength="7" @change="applyGlowHex(glowHex)" @blur="applyGlowHex(glowHex)" />
+        </div>
+
+        <div class="opacity-label-row">
+          <span class="sub-label">透明度</span>
+        </div>
+        <div class="slider-row">
+          <input v-model.number="glowOpacityModel" type="range" min="0" max="255" class="slider" />
+          <span class="slider-val">{{ glowOpacityPct }}%</span>
+        </div>
+
+        <div class="other-label">偏移 <span class="unit">px</span></div>
+        <div class="offset-row">
+          <span class="offset-label">X</span>
+          <input v-model.number="glowDxModel" type="number" min="-50" max="50" class="num-input narrow" />
+          <span class="offset-label">Y</span>
+          <input v-model.number="glowDyModel" type="number" min="-50" max="50" class="num-input narrow" />
+        </div>
+
+        <div class="other-label">大小 <span class="unit">px</span></div>
+        <div class="input-wrap">
+          <input v-model.number="glowSizeModel" type="number" min="0" max="100" class="num-input narrow" />
+        </div>
+
+        <div class="other-label">扩展 <span class="unit">px</span></div>
+        <div class="input-wrap">
+          <input v-model.number="glowSpreadModel" type="number" min="0" max="100" class="num-input narrow" />
         </div>
       </div>
     </div>
@@ -172,4 +264,6 @@ function toggleEcho() {
 .fade-in { animation: fadeSlideIn 0.25s ease-out; }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .conflict-hint { font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+.offset-row { display: flex; align-items: center; gap: 6px; }
+.offset-label { font-size: 11px; color: var(--text-muted); font-weight: 500; min-width: 14px; text-align: center; }
 </style>
