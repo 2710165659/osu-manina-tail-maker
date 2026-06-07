@@ -3,10 +3,12 @@
     <div class="topbar">
       <div class="topbar-left">
         <button class="topbar-trigger" @click="showToolboxPanel = true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <rect x="1" y="5" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.1" />
-            <path d="M4 5V3a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
-            <line x1="7" y1="8" x2="7" y2="11" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M7.5 1.5L3 6l4.5 4.5L12 6 7.5 1.5z" stroke="currentColor" stroke-width="1.2"
+              stroke-linejoin="round" />
+            <path d="M3 12l4.5 4.5L12 12" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+            <circle cx="14" cy="4" r="2.5" stroke="currentColor" stroke-width="1.2" />
+            <path d="M14 2.5v3M12.5 4h3" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
           </svg>
           工具箱
         </button>
@@ -66,24 +68,11 @@
     </div>
     <ExportBar />
 
+    <!-- 预设面板 -->
     <PresetPanel v-if="showPresetPanel" @close="showPresetPanel = false" />
 
     <!-- 工具箱面板 -->
-    <div v-if="showToolboxPanel" class="panel-overlay" @click.self="showToolboxPanel = false">
-      <div class="overlay-panel">
-        <div class="overlay-header">
-          <span class="overlay-title">工具箱</span>
-          <button class="close-btn" @click="showToolboxPanel = false">
-            <svg width="14" height="14" viewBox="0 0 14 14">
-              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-            </svg>
-          </button>
-        </div>
-        <div class="overlay-body">
-          <div class="empty-hint">暂无工具</div>
-        </div>
-      </div>
-    </div>
+    <ToolPanel v-if="showToolboxPanel" @close="showToolboxPanel = false" />
 
     <!-- 导入图片面板 -->
     <ImportPanel v-if="showImportPanel" @close="showImportPanel = false" />
@@ -96,6 +85,7 @@ import { useConfig } from '../../composables/useConfig'
 import ExportBar from './ExportBar.vue'
 import PresetPanel from './PresetPanel.vue'
 import ImportPanel from './ImportPanel.vue'
+import ToolPanel from './ToolPanel.vue'
 
 const { config, previewBase64, previewLoading, resetConfig, currentPreset } = useConfig()
 
@@ -414,102 +404,6 @@ watch([s, cw, ch], paint, { flush: 'post' })
   background: oklch(0.4 0.1 16 / 0.4);
 }
 
-.panel-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 20000;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: panelFadeIn 0.2s ease-out;
-}
-
-@keyframes panelFadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-.overlay-panel {
-  width: 820px;
-  max-width: 92vw;
-  max-height: 85vh;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 212, 240, 0.3);
-  animation: panelSlideUp 0.25s ease-out;
-}
-
-@keyframes panelSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.97);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.overlay-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.overlay-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: 0.3px;
-}
-
-.close-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-
-.close-btn:hover {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-.overlay-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.empty-hint {
-  color: var(--text-muted);
-  font-size: 13px;
-}
 
 .st {
   display: flex;
