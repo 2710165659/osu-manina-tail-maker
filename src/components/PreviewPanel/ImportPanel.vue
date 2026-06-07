@@ -4,7 +4,7 @@ import { useConfig } from '../../composables/useConfig'
 import { useNotification } from '../../composables/useNotification'
 
 const emit = defineEmits<{ close: [] }>()
-const { presets, savePreset, config } = useConfig()
+const { presets, savePreset, loadPreset } = useConfig()
 const { notify } = useNotification()
 
 const loading = ref(false)
@@ -12,6 +12,7 @@ const previewUrl = ref('')
 const renderPreview = ref('')
 const parsedConfig = ref<any>(null)
 const warnings = ref<string[]>([])
+const debugInfo = ref<string[]>([])
 const error = ref('')
 const presetName = ref('')
 const overwriteConfirming = ref(false)
@@ -76,9 +77,10 @@ async function handleSelectFile() {
     } catch { /* ignore */ }
 
     // 解析配置
-    const [cfg, warns] = await invoke<[any, string[]]>('parse_image_to_preset', { imagePath: selected })
+    const [cfg, warns, dbg] = await invoke<[any, string[], string[]]>('parse_image_to_preset', { imagePath: selected })
     parsedConfig.value = cfg
     warnings.value = warns
+    debugInfo.value = dbg
     presetName.value = cfg.image.filename
 
     // 渲染效果预览
@@ -121,9 +123,9 @@ async function handleSave() {
 
 async function doSave(name: string) {
   try {
-    await savePreset(name, parsedConfig.value)
-    notify(`已保存为预设: ${name}`, 'success')
-    Object.assign(config, parsedConfig.value)
+    const saved = await savePreset(name, parsedConfig.value)
+    loadPreset(saved)
+    notify(`已保存并切换为预设: ${name}`, 'success')
     emit('close')
   } catch (err) {
     notify(String(err), 'error', 5000)
@@ -171,7 +173,11 @@ function colorStr(c: { r: number; g: number; b: number }) {
 
         <!-- 中列：警告 + 解析信息 -->
         <div ref="colMidRef" class="col col-mid">
-          <div class="col-title">解析信息</div>
+          <div class="col-title">解析信息
+            <span v-if="debugInfo.length" class="debug-hint">?
+              <span class="debug-tooltip">{{ debugInfo.join('\n') }}</span>
+            </span>
+          </div>
           <div class="info-scroll">
             <!-- 未上传时提示 -->
             <div v-if="!parsedConfig && !loading && !error" class="info-notice">
@@ -225,7 +231,7 @@ function colorStr(c: { r: number; g: number; b: number }) {
               <div class="info-section">
                 <div class="sec-title">顶端</div>
                 <div class="kv"><span class="k">形状</span><span class="v">{{ formatShape(parsedConfig.cap.shape)
-                    }}</span></div>
+                }}</span></div>
                 <div class="kv"><span class="k">缩放</span><span class="v">{{ parsedConfig.cap.scale }}%</span></div>
               </div>
             </template>
@@ -252,11 +258,8 @@ function colorStr(c: { r: number; g: number; b: number }) {
         </div>
         <div class="footer-right">
           <button class="btn cancel" @click="emit('close')">取消</button>
-          <button
-            :class="['btn', overwriteConfirming ? 'confirming' : 'save']"
-            :disabled="!parsedConfig || !presetName"
-            @click="handleSave"
-          >{{ overwriteConfirming ? '确认覆盖？' : '保存到预设' }}</button>
+          <button :class="['btn', overwriteConfirming ? 'confirming' : 'save']" :disabled="!parsedConfig || !presetName"
+            @click="handleSave">{{ overwriteConfirming ? '确认覆盖？' : '保存到预设' }}</button>
         </div>
       </div>
     </div>
@@ -363,6 +366,7 @@ function colorStr(c: { r: number; g: number; b: number }) {
   height: 18px;
   line-height: 18px;
   text-align: center;
+  position: relative;
 }
 
 .col-left {
@@ -377,6 +381,8 @@ function colorStr(c: { r: number; g: number; b: number }) {
 .col-mid {
   margin-left: 170px;
   margin-right: 190px;
+  position: relative;
+  z-index: 1;
 }
 
 .col-right {
@@ -507,6 +513,52 @@ function colorStr(c: { r: number; g: number; b: number }) {
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 5px;
+}
+
+.debug-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transform: translateY(-1px);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(128, 128, 128, 0.25);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.debug-tooltip {
+  display: none;
+  position: absolute;
+  text-align: left;
+  left: 0;
+  top: calc(100% + 4px);
+  opacity: 0.9;
+  padding: 4px 10px;
+  background: rgba(30, 30, 30, 0.95);
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: pre;
+  line-height: 1.5;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: max-content;
+  pointer-events: none;
+  word-spacing: 0.5em;
+}
+
+.debug-hint:hover .debug-tooltip {
+  display: block;
+  float: left;
+  z-index: 30000;
 }
 
 .warn-item {

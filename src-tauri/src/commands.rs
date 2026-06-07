@@ -221,9 +221,9 @@ pub fn render_preset_thumbnail(config: TailConfig) -> Result<String, String> {
 }
 
 /// 解析图片为预设配置
-/// 返回 (配置, 警告列表)
+/// 返回 (配置, 警告列表, 调试信息)
 #[tauri::command]
-pub fn parse_image_to_preset(image_path: String) -> Result<(TailConfig, Vec<String>), String> {
+pub fn parse_image_to_preset(image_path: String) -> Result<(TailConfig, Vec<String>, Vec<String>), String> {
     let path = PathBuf::from(&image_path);
     if !path.exists() {
         return Err("图片文件不存在".to_string());
@@ -232,7 +232,7 @@ pub fn parse_image_to_preset(image_path: String) -> Result<(TailConfig, Vec<Stri
     let result = image_parser::parse_image(&path)
         .map_err(|e| format!("解析失败: {}", e))?;
 
-    Ok((result.config, result.warnings))
+    Ok((result.config, result.warnings, result.debug_info))
 }
 
 /// 读取图片顶部 500px 并返回 base64 编码的 PNG

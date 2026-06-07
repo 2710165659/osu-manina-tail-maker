@@ -12,12 +12,13 @@ use crate::config::{
 pub struct ParseResult {
     pub config: TailConfig,
     pub warnings: Vec<String>,
+    pub debug_info: Vec<String>,
 }
 
 /// 解析错误
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
-    #[error("解析失败或非投皮：body 高度不足 5000px")]
+    #[error("body 高度不足 5000px，不支持非投皮图片")]
     BodyTooShort,
     #[error("无法读取图片: {0}")]
     ImageReadError(#[from] image::ImageError),
@@ -31,15 +32,12 @@ pub fn parse_image(image_path: &Path) -> Result<ParseResult, ParseError> {
     let rgba = img.to_rgba8();
     let (width, height) = rgba.dimensions();
 
-    // 打印文件名
-    eprintln!("\n=====================================");
-    eprintln!("解析图片: {:?}", image_path.file_name().unwrap_or_default());
-    eprintln!("图片尺寸: {}x{}", width, height);
-    eprintln!("=====================================");
-
     if width == 0 || height == 0 {
         return Err(ParseError::ImageTooSmall);
     }
+
+    let mut debug = DebugInfo::default();
+    debug.image_size = Some((width, height));
 
     let mut warnings = Vec::new();
 
@@ -55,7 +53,7 @@ pub fn parse_image(image_path: &Path) -> Result<ParseResult, ParseError> {
     let image_config = ImageConfig {
         width,
         height,
-        filename,
+        filename: filename.clone(),
     };
 
     // 2. 边缘检测
@@ -71,6 +69,7 @@ pub fn parse_image(image_path: &Path) -> Result<ParseResult, ParseError> {
 
     // 3. 从下到上检测 body
     let body_region = detect_body(&rgba, margin)?;
+    debug.body_region = Some((body_region.y_start, body_region.y_end, body_region.x_start, body_region.x_end));
     let (global_color, global_opacity) = extract_body_color(&rgba, &body_region);
 
     // 4. 先检测 border 来确定内容宽度
@@ -85,9 +84,12 @@ pub fn parse_image(image_path: &Path) -> Result<ParseResult, ParseError> {
         body_region.x_end - body_region.x_start
     };
 
-    // 5. 检测 cap（传入实际内容宽度）
-    let (cap_config, cap_warnings) = detect_cap(&rgba, &body_region, margin, content_width);
+    // 5. 检测 cap（传入实际内容宽度和调试信息）
+    let (cap_config, cap_warnings) = detect_cap(&rgba, &body_region, margin, content_width, &mut debug);
     warnings.extend(cap_warnings);
+
+    // 统一显示调试信息
+    debug.display(&filename);
 
     let config = TailConfig {
         image: image_config,
@@ -132,7 +134,9 @@ pub fn parse_image(image_path: &Path) -> Result<ParseResult, ParseError> {
         },
     };
 
-    Ok(ParseResult { config, warnings })
+    let debug_info = debug.to_lines();
+
+    Ok(ParseResult { config, warnings, debug_info })
 }
 
 /// 检测左右边距（扫描左右边缘透明像素）
@@ -330,11 +334,133 @@ fn extract_body_color(rgba: &RgbaImage, body: &BodyRegion) -> (RgbaColor, u8) {
 /// 形状检测结果
 struct ShapeResult {
     shape: CapShape,
-    aspect_ratio: f64, // 实际宽高比
+}
+
+/// 调试信息结构体
+#[derive(Default)]
+struct DebugInfo {
+    // 图片基本信息
+    image_size: Option<(u32, u32)>,
+    // Body 信息
+    body_region: Option<(u32, u32, u32, u32)>, // y_start, y_end, x_start, x_end
+    // Cap 信息
+    cap_region: Option<(u32, u32, u32, u32)>, // y_start, y_end, x_start, x_end
+    content_width: Option<u32>,
+    // 形状检测阶段日志（带 [形状检测] 前缀）
+    shape_detection_msgs: Vec<String>,
+    // 形状分析阶段日志（带 [形状分析] 前缀）
+    shape_analysis_msgs: Vec<String>,
+    // 汇总信息
+    detected_shape: Option<CapShape>,
+    aspect_ratio: Option<f64>,
+    calculated_scale: Option<u32>,
+}
+
+impl DebugInfo {
+    /// 将调试信息收集为字符串行（用于传递给前端）
+    fn to_lines(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+
+        if let Some((w, h)) = self.image_size {
+            lines.push(format!("图片尺寸: {}x{}", w, h));
+        }
+
+        // 1. Cap 区域
+        if let Some((ys, ye, xs, xe)) = self.cap_region {
+            let height = ye - ys;
+            let width = xe - xs;
+            lines.push(format!("Cap 区域: y={}..{} (高度={}), x={}..{} (宽度={})", ys, ye, height, xs, xe, width));
+        }
+
+        // 2. Body 区域
+        if let Some((ys, ye, xs, xe)) = self.body_region {
+            lines.push(format!("Body 区域: y={}..{}, x={}..{}", ys, ye, xs, xe));
+        }
+
+        // 3. Content width
+        if let Some(cw) = self.content_width {
+            lines.push(format!("Content width (排除边框): {}", cw));
+        }
+
+        // 4. 形状检测日志
+        lines.extend(self.shape_detection_msgs.iter().cloned());
+
+        // 5. 形状分析日志
+        lines.extend(self.shape_analysis_msgs.iter().cloned());
+
+        // 6. 汇总
+        if let Some(shape) = &self.detected_shape {
+            lines.push(format!("检测到的形状: {:?}", shape));
+        }
+        if let Some(ar) = self.aspect_ratio {
+            lines.push(format!("轮廓宽高比: {:.2}", ar));
+        }
+        if let Some(scale) = self.calculated_scale {
+            lines.push(format!("计算的缩放: {}%", scale));
+            if let Some(CapShape::Ball) = &self.detected_shape {
+                lines.push("  -> 球形统一缩放100%".to_string());
+            }
+        }
+
+        lines
+    }
+
+    /// 统一显示所有调试信息
+    fn display(&self, filename: &str) {
+        eprintln!("\n=====================================");
+        eprintln!("解析图片: {}", filename);
+        if let Some((w, h)) = self.image_size {
+            eprintln!("图片尺寸: {}x{}", w, h);
+        }
+        eprintln!("=====================================");
+
+        // 1. Cap 区域
+        if let Some((ys, ye, xs, xe)) = self.cap_region {
+            let height = ye - ys;
+            let width = xe - xs;
+            eprintln!("Cap 区域: y={}..{} (高度={}), x={}..{} (宽度={})", ys, ye, height, xs, xe, width);
+        }
+
+        // 2. Body 区域
+        if let Some((ys, ye, xs, xe)) = self.body_region {
+            eprintln!("Body 区域: y={}..{}, x={}..{}", ys, ye, xs, xe);
+        }
+
+        // 3. Content width
+        if let Some(cw) = self.content_width {
+            eprintln!("Content width (排除边框): {}", cw);
+        }
+
+        // 4. 形状检测日志
+        for msg in &self.shape_detection_msgs {
+            eprintln!("{}", msg);
+        }
+
+        // 5. 形状分析日志
+        for msg in &self.shape_analysis_msgs {
+            eprintln!("{}", msg);
+        }
+
+        // 6. 汇总
+        if let Some(shape) = &self.detected_shape {
+            eprintln!("检测到的形状: {:?}", shape);
+        }
+        if let Some(ar) = self.aspect_ratio {
+            eprintln!("轮廓宽高比: {:.2}", ar);
+        }
+        if let Some(scale) = self.calculated_scale {
+            eprintln!("计算的缩放: {}%", scale);
+            if let Some(CapShape::Ball) = &self.detected_shape {
+                eprintln!("  -> 球形统一缩放100%");
+            }
+        }
+
+        eprintln!("=====================================\n");
+    }
 }
 
 /// 检测 cap 形状
-fn detect_cap(rgba: &RgbaImage, body: &BodyRegion, _margin: u32, content_width: u32) -> (CapConfig, Vec<String>) {
+fn detect_cap(rgba: &RgbaImage, body: &BodyRegion, _margin: u32, content_width: u32, debug: &mut DebugInfo) -> (CapConfig, Vec<String>) {
     let mut warnings = Vec::new();
     let (img_width, _img_height) = rgba.dimensions();
 
@@ -392,44 +518,22 @@ fn detect_cap(rgba: &RgbaImage, body: &BodyRegion, _margin: u32, content_width: 
         }
     }
 
-    let cap_width = cap_x_end - cap_x_start;
+    // 填充调试信息
+    debug.cap_region = Some((cap_y_start, cap_y_end, cap_x_start, cap_x_end));
+    debug.content_width = Some(content_width);
 
-    // 调试信息
-    eprintln!("=== Cap 检测调试 ===");
-    eprintln!("Cap 区域: y={}..{} (高度={}), x={}..{} (宽度={})",
-        cap_y_start, cap_y_end, cap_height, cap_x_start, cap_x_end, cap_width);
-    eprintln!("Body 区域: y={}..{}, x={}..{}",
-        body.y_start, body.y_end, body.x_start, body.x_end);
-    eprintln!("Content width (排除边框): {}", content_width);
-
-    let shape_result = detect_shape(rgba, cap_y_start, cap_y_end, cap_x_start, cap_x_end);
-    eprintln!("检测到的形状: {:?}", shape_result.shape);
-    eprintln!("轮廓宽高比: {:.2}", shape_result.aspect_ratio);
+    let (shape_result, shape_debug) = detect_shape(rgba, cap_y_start, cap_y_end, cap_x_start, cap_x_end);
+    // 合并形状检测的调试信息
+    debug.shape_detection_msgs = shape_debug.shape_detection_msgs;
+    debug.shape_analysis_msgs = shape_debug.shape_analysis_msgs;
+    debug.aspect_ratio = shape_debug.aspect_ratio;
 
     // 计算 scale
-    // 矩形不需要缩放，只有球形和菱形才需要
+    // 球形统一 100%，不管宽高比；矩形固定 100%；菱形和渐变按原逻辑
     let scale = match shape_result.shape {
-        CapShape::Rect => 100, // 矩形固定 100%
-        CapShape::Ball => {
-            // 球形：基于轮廓的实际宽高比计算
-            // aspect_ratio = 实际宽度 / 实际高度
-            // 如果是标准半圆，宽高比应该是 2:1
-            // scale 表示相对于标准形状的拉伸比例
-            if content_width > 0 && shape_result.aspect_ratio > 0.0 {
-                // 期望的宽高比是 2:1 (半圆)
-                let expected_ratio = 2.0;
-                // 如果实际比例 < 2.0，说明被压扁了，需要拉伸
-                // scale = (actual_height / expected_height) * 100
-                // expected_height = content_width / expected_ratio
-                // actual_height = cap_width / aspect_ratio
-                let scale_factor = (cap_width as f64 / shape_result.aspect_ratio) / (content_width as f64 / expected_ratio);
-                ((scale_factor * 100.0).round() as u32).clamp(10, 1000)
-            } else {
-                100
-            }
-        }
+        CapShape::Rect => 100,
+        CapShape::Ball => 100, // 球形统一 100%
         CapShape::Diamond => {
-            // 菱形：使用原来的计算方式
             if content_width > 0 {
                 ((cap_height as f64 * 200.0 / content_width as f64).round() as u32).min(1000)
             } else {
@@ -437,7 +541,6 @@ fn detect_cap(rgba: &RgbaImage, body: &BodyRegion, _margin: u32, content_width: 
             }
         }
         CapShape::Gradient => {
-            // 渐变：使用原来的计算方式
             if content_width > 0 {
                 ((cap_height as f64 * 200.0 / content_width as f64).round() as u32).min(1000)
             } else {
@@ -445,8 +548,9 @@ fn detect_cap(rgba: &RgbaImage, body: &BodyRegion, _margin: u32, content_width: 
             }
         }
     };
-    eprintln!("计算的缩放: {}%", scale);
-    eprintln!("==================\n");
+
+    debug.detected_shape = Some(shape_result.shape);
+    debug.calculated_scale = Some(scale);
 
     (
         CapConfig {
@@ -472,19 +576,17 @@ fn detect_shape(
     y_end: u32,
     x_start: u32,
     x_end: u32,
-) -> ShapeResult {
+) -> (ShapeResult, DebugInfo) {
+    let mut debug = DebugInfo::default();
+    let msgs = &mut debug.shape_detection_msgs;
     let width = x_end - x_start;
     let height = y_end - y_start;
 
     if width == 0 || height == 0 {
-        eprintln!("  [形状检测] 宽度或高度为0，返回矩形");
-        return ShapeResult {
-            shape: CapShape::Rect,
-            aspect_ratio: 1.0,
-        };
+        return (ShapeResult { shape: CapShape::Rect }, debug);
     }
 
-    eprintln!("  [形状检测] Cap 原始尺寸: 宽={}, 高={}", width, height);
+    msgs.push(format!("  [形状检测] Cap 原始尺寸: 宽={}, 高={}", width, height));
 
     // 1. 提取 cap 区域
     let cap_region = extract_region(rgba, y_start, y_end, x_start, x_end);
@@ -498,7 +600,7 @@ fn detect_shape(
         imageops::FilterType::Lanczos3,
     );
 
-    eprintln!("  [形状检测] 放大后尺寸: 宽={}, 高={}", upscaled.width(), upscaled.height());
+    msgs.push(format!("  [形状检测] 放大后尺寸: 宽={}, 高={}", upscaled.width(), upscaled.height()));
 
     // 3. 转为二值图像
     let binary = binarize_rgba(&upscaled);
@@ -507,11 +609,7 @@ fn detect_shape(
     let contours = find_contours::<u32>(&binary);
 
     if contours.is_empty() {
-        eprintln!("  [形状检测] 未找到轮廓，返回矩形");
-        return ShapeResult {
-            shape: CapShape::Rect,
-            aspect_ratio: width as f64 / height as f64,
-        };
+        return (ShapeResult { shape: CapShape::Rect }, debug);
     }
 
     // 找到最大的轮廓
@@ -519,21 +617,21 @@ fn detect_shape(
         .max_by_key(|c| c.points.len())
         .unwrap();
 
-    eprintln!("  [形状检测] 找到主轮廓，点数: {}", main_contour.points.len());
+    msgs.push(format!("  [形状检测] 找到主轮廓，点数: {}", main_contour.points.len()));
 
     // 5. 简化轮廓（RDP算法，epsilon也要按比例放大）
     let simplified = simplify_contour(&main_contour.points, 2.0 * scale_factor as f64);
-    eprintln!("  [形状检测] 简化后点数: {}", simplified.len());
+    msgs.push(format!("  [形状检测] 简化后点数: {}", simplified.len()));
 
     // 6. 分析形状特征（使用原始尺寸）
-    let (shape, aspect_ratio) = analyze_contour_shape(&simplified, width, height);
+    let (shape, aspect_ratio, analysis_msgs) = analyze_contour_shape(&simplified, width, height);
+    debug.shape_analysis_msgs = analysis_msgs;
 
-    eprintln!("  [形状检测] 判定为: {:?}, 宽高比: {:.2}", shape, aspect_ratio);
+    debug.detected_shape = Some(shape);
+    debug.aspect_ratio = Some(aspect_ratio);
+    msgs.push(format!("  [形状检测] 判定为: {:?}, 宽高比: {:.2}", shape, aspect_ratio));
 
-    ShapeResult {
-        shape,
-        aspect_ratio,
-    }
+    (ShapeResult { shape }, debug)
 }
 
 /// 提取区域为 RgbaImage
@@ -650,11 +748,13 @@ fn perpendicular_distance(point: (f64, f64), line_start: (f64, f64), line_end: (
     numerator / denominator
 }
 
-/// 分析轮廓形状，返回形状类型和实际宽高比
-fn analyze_contour_shape(points: &[(f64, f64)], _width: u32, _height: u32) -> (CapShape, f64) {
+/// 分析轮廓形状，返回 (形状类型, 实际宽高比, 调试消息)
+fn analyze_contour_shape(points: &[(f64, f64)], _width: u32, _height: u32) -> (CapShape, f64, Vec<String>) {
+    let mut msgs = Vec::new();
+
     if points.len() < 4 {
-        eprintln!("    [形状分析] 点数太少 ({}), 返回矩形", points.len());
-        return (CapShape::Rect, 1.0);
+        msgs.push(format!("    [形状分析] 点数太少 ({}), 返回矩形", points.len()));
+        return (CapShape::Rect, 1.0, msgs);
     }
 
     // 计算轮廓的矩形度、圆形度、凸性等特征
@@ -669,7 +769,7 @@ fn analyze_contour_shape(points: &[(f64, f64)], _width: u32, _height: u32) -> (C
         1.0
     };
 
-    eprintln!("    [形状分析] 边界框: 宽={:.1}, 高={:.1}, 宽高比={:.2}", bbox_width, bbox_height, aspect_ratio);
+    msgs.push(format!("    [形状分析] 边界框: 宽={:.1}, 高={:.1}, 宽高比={:.2}", bbox_width, bbox_height, aspect_ratio));
 
     // 计算轮廓面积（使用 Shoelace 公式）
     let contour_area = polygon_area(points);
@@ -680,12 +780,12 @@ fn analyze_contour_shape(points: &[(f64, f64)], _width: u32, _height: u32) -> (C
         0.0
     };
 
-    eprintln!("    [形状分析] 矩形度: {:.2} (>0.85为矩形)", rectangularity);
+    msgs.push(format!("    [形状分析] 矩形度: {:.2} (>0.85为矩形)", rectangularity));
 
     // 矩形度高 -> 矩形
     if rectangularity > 0.85 {
-        eprintln!("    [形状分析] 高矩形度，判定为矩形");
-        return (CapShape::Rect, aspect_ratio);
+        msgs.push("    [形状分析] 高矩形度，判定为矩形".to_string());
+        return (CapShape::Rect, aspect_ratio, msgs);
     }
 
     // 计算圆形度（周长^2 / (4π * 面积)）
@@ -696,36 +796,45 @@ fn analyze_contour_shape(points: &[(f64, f64)], _width: u32, _height: u32) -> (C
         f64::MAX
     };
 
-    eprintln!("    [形状分析] 圆形度: {:.2} (1.0为完美圆形，<1.5为椭圆)", circularity);
+    msgs.push(format!("    [形状分析] 圆形度: {:.2} (1.0为完美圆形，<1.5为椭圆)", circularity));
 
     // 圆形度接近1 -> 椭圆/球形
     if circularity < 1.5 {
-        eprintln!("    [形状分析] 低圆形度值，判定为球形（椭圆）");
-        return (CapShape::Ball, aspect_ratio);
+        let convex_vertices = detect_convex_vertices(points);
+        msgs.push(format!("    [形状分析] 凸顶点数: {}", convex_vertices));
+        msgs.push("    [形状分析] 低圆形度值，判定为球形（椭圆）".to_string());
+        return (CapShape::Ball, aspect_ratio, msgs);
     }
 
-    // 检测是否为菱形（检查简化后的顶点数）
+    // 检测凸顶点数
     let convex_vertices = detect_convex_vertices(points);
-    eprintln!("    [形状分析] 凸顶点数: {}", convex_vertices);
+    msgs.push(format!("    [形状分析] 凸顶点数: {}", convex_vertices));
 
+    // 凸顶点数 >= 5 -> 判定为球形
+    if convex_vertices >= 5 {
+        msgs.push("    [形状分析] 凸顶点数>=5，判定为球形".to_string());
+        return (CapShape::Ball, aspect_ratio, msgs);
+    }
+
+    // 4个凸顶点且非矩形 -> 菱形
     if convex_vertices == 4 && rectangularity < 0.7 && circularity > 1.5 {
-        eprintln!("    [形状分析] 4个凸顶点且非矩形，判定为菱形");
-        return (CapShape::Diamond, aspect_ratio);
+        msgs.push("    [形状分析] 4个凸顶点且非矩形，判定为菱形".to_string());
+        return (CapShape::Diamond, aspect_ratio, msgs);
     }
 
     // 默认根据形状特征判断
     let shape = if rectangularity > 0.7 {
-        eprintln!("    [形状分析] 默认判定为矩形");
+        msgs.push("    [形状分析] 默认判定为矩形".to_string());
         CapShape::Rect
     } else if circularity < 2.0 {
-        eprintln!("    [形状分析] 默认判定为球形");
+        msgs.push("    [形状分析] 默认判定为球形".to_string());
         CapShape::Ball
     } else {
-        eprintln!("    [形状分析] 默认判定为菱形");
+        msgs.push("    [形状分析] 默认判定为菱形".to_string());
         CapShape::Diamond
     };
 
-    (shape, aspect_ratio)
+    (shape, aspect_ratio, msgs)
 }
 
 /// 计算边界框

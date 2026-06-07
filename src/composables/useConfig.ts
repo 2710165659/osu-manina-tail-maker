@@ -81,13 +81,15 @@ export function useConfig() {
     await updatePreview()
   }
 
-  async function savePreset(name: string, presetConfig?: TailConfig) {
+  async function savePreset(name: string, presetConfig?: TailConfig): Promise<Preset> {
     const newConfig = JSON.parse(JSON.stringify(presetConfig || config))
     const idx = presets.value.findIndex(p => p.name === name)
 
+    let saved: Preset
     if (idx >= 0) {
       // 覆盖已有预设（UI 层已做二次确认）
       presets.value[idx].config = newConfig
+      saved = presets.value[idx]
       // 更新当前预设引用
       if (currentPreset.value?.name === name) {
         currentPreset.value = JSON.parse(JSON.stringify(presets.value[idx]))
@@ -100,8 +102,10 @@ export function useConfig() {
         builtin: false,
       }
       presets.value.push(newPreset)
+      saved = newPreset
     }
     await persistUserPresets()
+    return saved
   }
 
   async function deletePreset(name: string) {
@@ -111,9 +115,15 @@ export function useConfig() {
       throw new Error(`不能删除内置预设 "${name}"`)
     }
     presets.value.splice(idx, 1)
-    // 如果删除的是当前预设，清除引用
+    // 如果删除的是当前预设，回退到第一个内置预设
     if (currentPreset.value?.name === name) {
-      currentPreset.value = null
+      const firstBuiltin = presets.value.find(p => p.builtin)
+      if (firstBuiltin) {
+        currentPreset.value = JSON.parse(JSON.stringify(firstBuiltin))
+        Object.assign(config, JSON.parse(JSON.stringify(firstBuiltin.config)))
+      } else {
+        currentPreset.value = null
+      }
     }
     await persistUserPresets()
   }
