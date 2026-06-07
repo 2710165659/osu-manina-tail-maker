@@ -45,7 +45,7 @@ pub fn parse_image(image_path: &Path) -> Result<ParseResult, ParseError> {
 
     // 1. 基本信息
     let filename = format!(
-        "upload-{}",
+        "import-{}",
         image_path
             .file_stem()
             .and_then(|s| s.to_str())
