@@ -25,20 +25,6 @@ const glowSpreadModel = computed({
   get: () => config.effect.glowSpread,
   set: (v: number) => setEffectProp('glowSpread', Math.max(0, Math.min(100, v))),
 })
-function toggleGlow() {
-  const next = !config.effect.glowEnabled
-  setEffectProp('glowEnabled', next)
-  if (next) {
-    setEffectProp('glowColor', { r: 144, g: 238, b: 144, a: 255 })
-  } else {
-    resetEffectField('glowColor')
-    resetEffectField('glowOpacity')
-    resetEffectField('glowSize')
-    resetEffectField('glowSpread')
-    resetEffectField('glowMatchBody')
-    resetEffectField('glowOpacityIndependent')
-  }
-}
 
 // 暗化重复
 const echoHex = ref(rgbaToHex(config.effect.echoColor))

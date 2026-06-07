@@ -4,7 +4,7 @@ import { useConfig } from '../../composables/useConfig'
 import { useNotification } from '../../composables/useNotification'
 
 const emit = defineEmits<{ close: [] }>()
-const { savePreset, config } = useConfig()
+const { presets, savePreset, config } = useConfig()
 const { notify } = useNotification()
 
 const loading = ref(false)
@@ -14,11 +14,15 @@ const parsedConfig = ref<any>(null)
 const warnings = ref<string[]>([])
 const error = ref('')
 const presetName = ref('')
+const overwriteConfirming = ref(false)
+let overwriteTimer: ReturnType<typeof setTimeout> | null = null
+
+function isDuplicateName(name: string) {
+  return presets.value.some(p => p.name === name)
+}
 
 // 列高度同步
 const colMidRef = ref<HTMLElement | null>(null)
-const colLeftRef = ref<HTMLElement | null>(null)
-const colRightRef = ref<HTMLElement | null>(null)
 const midHeight = ref(220) // 解析前默认高度
 let resizeObserver: ResizeObserver | null = null
 
@@ -91,9 +95,34 @@ async function handleSelectFile() {
 
 async function handleSave() {
   if (!parsedConfig.value || !presetName.value) return
+  const name = presetName.value.trim()
+  if (!name) return
+
+  // 重名时需要二次确认覆盖
+  if (isDuplicateName(name)) {
+    if (overwriteConfirming.value) {
+      // 第二次点击，执行覆盖
+      if (overwriteTimer) { clearTimeout(overwriteTimer); overwriteTimer = null }
+      overwriteConfirming.value = false
+      await doSave(name)
+    } else {
+      // 第一次点击，进入确认状态
+      overwriteConfirming.value = true
+      overwriteTimer = setTimeout(() => {
+        overwriteConfirming.value = false
+        overwriteTimer = null
+      }, 2000)
+    }
+    return
+  }
+
+  await doSave(name)
+}
+
+async function doSave(name: string) {
   try {
-    await savePreset(presetName.value, parsedConfig.value)
-    notify(`已保存为预设: ${presetName.value}`, 'success')
+    await savePreset(name, parsedConfig.value)
+    notify(`已保存为预设: ${name}`, 'success')
     Object.assign(config, parsedConfig.value)
     emit('close')
   } catch (err) {
@@ -196,7 +225,7 @@ function colorStr(c: { r: number; g: number; b: number }) {
               <div class="info-section">
                 <div class="sec-title">顶端</div>
                 <div class="kv"><span class="k">形状</span><span class="v">{{ formatShape(parsedConfig.cap.shape)
-                }}</span></div>
+                    }}</span></div>
                 <div class="kv"><span class="k">缩放</span><span class="v">{{ parsedConfig.cap.scale }}%</span></div>
               </div>
             </template>
@@ -223,7 +252,11 @@ function colorStr(c: { r: number; g: number; b: number }) {
         </div>
         <div class="footer-right">
           <button class="btn cancel" @click="emit('close')">取消</button>
-          <button class="btn save" :disabled="!parsedConfig || !presetName" @click="handleSave">保存到预设</button>
+          <button
+            :class="['btn', overwriteConfirming ? 'confirming' : 'save']"
+            :disabled="!parsedConfig || !presetName"
+            @click="handleSave"
+          >{{ overwriteConfirming ? '确认覆盖？' : '保存到预设' }}</button>
         </div>
       </div>
     </div>
@@ -599,5 +632,15 @@ function colorStr(c: { r: number; g: number; b: number }) {
 .btn.save:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.btn.confirming {
+  border-color: #ff4466;
+  color: #ff4466;
+  background: oklch(0.35 0.08 16 / 0.3);
+}
+
+.btn.confirming:hover {
+  background: oklch(0.4 0.1 16 / 0.4);
 }
 </style>
