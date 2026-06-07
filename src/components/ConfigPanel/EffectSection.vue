@@ -1,77 +1,3 @@
-<script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useConfig } from '../../composables/useConfig'
-import { rgbaToHex, hexToRgba } from '../../types/config'
-
-const { config, setEffectProp, resetEffectField } = useConfig()
-
-// 外发光
-const glowHex = ref(rgbaToHex(config.effect.glowColor))
-watch(() => config.effect.glowColor, (c) => { glowHex.value = rgbaToHex(c) })
-function applyGlowHex(v: string) {
-  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
-  if (clean.length > 6) clean = clean.slice(0, 6)
-  if (clean.length === 1) clean = clean.repeat(6)
-  else if (clean.length === 2) clean = clean.repeat(3)
-  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
-  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
-  if (clean.length === 6) {
-    config.effect.glowColor = hexToRgba('#' + clean, config.effect.glowColor.a)
-    glowHex.value = '#' + clean
-  }
-}
-const glowOpacityVal = ref(config.effect.glowOpacity)
-watch(() => config.effect.glowOpacity, (v) => { glowOpacityVal.value = v })
-function applyGlowOpacity() { setEffectProp('glowOpacity', Math.max(0, Math.min(255, glowOpacityVal.value))) }
-const glowOpacityPct = computed(() => Math.round((glowOpacityVal.value / 255) * 100))
-const glowSizeVal = ref(config.effect.glowSize)
-watch(() => config.effect.glowSize, (v) => { glowSizeVal.value = v })
-function applyGlowSize() { setEffectProp('glowSize', Math.max(0, Math.min(100, glowSizeVal.value))) }
-const glowSpreadVal = ref(config.effect.glowSpread)
-watch(() => config.effect.glowSpread, (v) => { glowSpreadVal.value = v })
-function applyGlowSpread() { setEffectProp('glowSpread', Math.max(0, Math.min(100, glowSpreadVal.value))) }
-
-// 暗化重复
-const echoHex = ref(rgbaToHex(config.effect.echoColor))
-watch(() => config.effect.echoColor, (c) => { echoHex.value = rgbaToHex(c) })
-function applyEchoHex(v: string) {
-  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
-  if (clean.length > 6) clean = clean.slice(0, 6)
-  if (clean.length === 1) clean = clean.repeat(6)
-  else if (clean.length === 2) clean = clean.repeat(3)
-  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
-  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
-  if (clean.length === 6) {
-    config.effect.echoColor = hexToRgba('#' + clean, config.effect.echoColor.a)
-    echoHex.value = '#' + clean
-  }
-}
-const echoOpacityVal = ref(config.effect.echoOpacity)
-watch(() => config.effect.echoOpacity, (v) => { echoOpacityVal.value = v })
-function applyEchoOpacity() { setEffectProp('echoOpacity', Math.max(0, Math.min(255, echoOpacityVal.value))) }
-const echoOpacityPct = computed(() => Math.round((echoOpacityVal.value / 255) * 100))
-const throwMax = computed(() => Math.max(0, config.image.height - 1))
-const echoLengthVal = ref(config.effect.echoLength)
-watch(() => config.effect.echoLength, (v) => { echoLengthVal.value = v })
-function applyEchoLength() { setEffectProp('echoLength', Math.max(0, echoLengthVal.value)) }
-
-const isGradient = computed(() => config.cap.shape === 'gradient')
-
-function toggleEcho() {
-  if (isGradient.value) return
-  const next = !config.effect.capEchoEnabled
-  setEffectProp('capEchoEnabled', next)
-  if (next) {
-    // 打开时使用整体颜色
-    setEffectProp('echoColor', { ...config.globalColor })
-  } else {
-    resetEffectField('echoColor')
-    resetEffectField('echoOpacity')
-    resetEffectField('echoLength')
-  }
-}
-</script>
-
 <template>
   <section class="config-section">
     <h3 class="section-title">
@@ -110,13 +36,15 @@ function toggleEcho() {
           <span class="sub-label">透明度</span>
         </div>
         <div class="slider-row">
-          <input v-model.number="echoOpacityVal" type="range" min="0" max="255" class="slider" @change="applyEchoOpacity" />
+          <input v-model.number="echoOpacityVal" type="range" min="0" max="255" class="slider"
+            @change="applyEchoOpacity" />
           <span class="slider-val">{{ echoOpacityPct }}%</span>
         </div>
 
         <div class="other-label">长度 <span class="unit">px</span></div>
         <div class="input-wrap" style="margin-top:4px">
-          <input v-model.number="echoLengthVal" type="number" :min="0" :max="throwMax" class="num-input" @change="applyEchoLength" />
+          <input v-model.number="echoLengthVal" type="number" :min="0" :max="throwMax" class="num-input"
+            @change="applyEchoLength" />
         </div>
       </div>
     </div>
@@ -158,17 +86,93 @@ function toggleEcho() {
 
         <div class="other-label">大小 <span class="unit">px</span></div>
         <div class="input-wrap">
-          <input v-model.number="glowSizeVal" type="number" min="0" max="100" class="num-input narrow" @change="applyGlowSize" />
+          <input v-model.number="glowSizeVal" type="number" min="0" max="100" class="num-input narrow"
+            @change="applyGlowSize" />
         </div>
 
         <div class="other-label">扩展 <span class="unit">px</span></div>
         <div class="input-wrap">
-          <input v-model.number="glowSpreadVal" type="number" min="0" max="100" class="num-input narrow" @change="applyGlowSpread" />
+          <input v-model.number="glowSpreadVal" type="number" min="0" max="100" class="num-input narrow"
+            @change="applyGlowSpread" />
         </div>
       </div>
     </div>
   </section>
 </template>
+
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useConfig } from '../../composables/useConfig'
+import { rgbaToHex, hexToRgba } from '../../types/config'
+
+const { config, setEffectProp, resetEffectField } = useConfig()
+
+// 外发光
+const glowHex = ref(rgbaToHex(config.effect.glowColor))
+watch(() => config.effect.glowColor, (c) => { glowHex.value = rgbaToHex(c) })
+function applyGlowHex(v: string) {
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.effect.glowColor = hexToRgba('#' + clean, config.effect.glowColor.a)
+    glowHex.value = '#' + clean
+  }
+}
+const glowOpacityVal = ref(config.effect.glowOpacity)
+watch(() => config.effect.glowOpacity, (v) => { glowOpacityVal.value = v })
+function applyGlowOpacity() { setEffectProp('glowOpacity', Math.max(0, Math.min(255, glowOpacityVal.value))) }
+const glowOpacityPct = computed(() => Math.round((glowOpacityVal.value / 255) * 100))
+const glowSizeVal = ref(config.effect.glowSize)
+watch(() => config.effect.glowSize, (v) => { glowSizeVal.value = v })
+function applyGlowSize() { setEffectProp('glowSize', Math.max(0, Math.min(100, glowSizeVal.value))) }
+const glowSpreadVal = ref(config.effect.glowSpread)
+watch(() => config.effect.glowSpread, (v) => { glowSpreadVal.value = v })
+function applyGlowSpread() { setEffectProp('glowSpread', Math.max(0, Math.min(100, glowSpreadVal.value))) }
+
+// 暗化重复
+const echoHex = ref(rgbaToHex(config.effect.echoColor))
+watch(() => config.effect.echoColor, (c) => { echoHex.value = rgbaToHex(c) })
+function applyEchoHex(v: string) {
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.effect.echoColor = hexToRgba('#' + clean, config.effect.echoColor.a)
+    echoHex.value = '#' + clean
+  }
+}
+const echoOpacityVal = ref(config.effect.echoOpacity)
+watch(() => config.effect.echoOpacity, (v) => { echoOpacityVal.value = v })
+function applyEchoOpacity() { setEffectProp('echoOpacity', Math.max(0, Math.min(255, echoOpacityVal.value))) }
+const echoOpacityPct = computed(() => Math.round((echoOpacityVal.value / 255) * 100))
+const throwMax = computed(() => Math.max(0, config.image.height - 1))
+const echoLengthVal = ref(config.effect.echoLength)
+watch(() => config.effect.echoLength, (v) => { echoLengthVal.value = v })
+function applyEchoLength() { setEffectProp('echoLength', Math.max(0, echoLengthVal.value)) }
+
+const isGradient = computed(() => config.cap.shape === 'gradient')
+
+function toggleEcho() {
+  if (isGradient.value) return
+  const next = !config.effect.capEchoEnabled
+  setEffectProp('capEchoEnabled', next)
+  if (next) {
+    // 打开时使用整体颜色
+    setEffectProp('echoColor', { ...config.globalColor })
+  } else {
+    resetEffectField('echoColor')
+    resetEffectField('echoOpacity')
+    resetEffectField('echoLength')
+  }
+}
+</script>
 
 <style scoped>
 .section-icon-svg {

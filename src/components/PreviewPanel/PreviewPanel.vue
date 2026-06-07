@@ -1,3 +1,95 @@
+<template>
+  <div class="preview-panel">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="topbar-trigger" @click="showToolboxPanel = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="5" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.1" />
+            <path d="M4 5V3a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+            <line x1="7" y1="8" x2="7" y2="11" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+          </svg>
+          工具箱
+        </button>
+        <button class="topbar-trigger" @click="showPresetPanel = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1" />
+            <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1" />
+            <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1" />
+            <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1" />
+          </svg>
+          预设
+        </button>
+        <button class="topbar-trigger" @click="showImportPanel = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 2v7M4 6.5 7 9.5 10 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M2 9v2.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" stroke="currentColor" stroke-width="1.1"
+              stroke-linecap="round" />
+          </svg>
+          导入图片
+        </button>
+        <button :class="['reset-trigger', { confirming: resetConfirming }]" @click="handleReset">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M2 7a5 5 0 0 1 9.33-2.5M12 7a5 5 0 0 1-9.33 2.5" stroke="currentColor" stroke-width="1.3"
+              stroke-linecap="round" />
+            <path d="M11.5 1.5v3h-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M2.5 12.5v-3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+          {{ resetConfirming ? '确认重置？' : (currentPreset ? `重置到"${currentPreset.name}"` : '重置') }}
+        </button>
+      </div>
+      <span class="st"><span :class="['dot', previewLoading ? 'ld' : 'ok']"></span>{{ previewLoading ? '渲染中' : '预览'
+        }}</span>
+    </div>
+
+    <div ref="container" class="cv" @mousedown="onMD" @mousemove="onMM" @mouseup="onMU" @mouseleave="onMU"
+      @wheel="onWh">
+      <canvas ref="mainCanvas" class="c1"></canvas>
+      <canvas ref="annoCanvas" class="c2"></canvas>
+      <div class="bg-wrap" @mousedown.stop @mouseup.stop>
+        <button class="bg-btn" @click="resetView">恢复视角</button>
+        <button class="bg-btn" @click="toggleBgMenu">切换背景</button>
+        <div v-if="bgMenuOpen" class="bg-drop">
+          <button v-for="m in bgModes" :key="m" :class="['bg-opt', { on: bgMode === m }]" @click="selectBg(m)">{{
+            bgLabels[m] }}</button>
+        </div>
+      </div>
+      <div v-if="!previewBase64 && !previewLoading" class="ph">
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+          <rect x="12" y="8" width="24" height="34" rx="3" stroke="#5a5e7a" stroke-width="1" />
+          <path d="M12 16 A12 6 0 0 1 36 16" stroke="#5a5e7a" stroke-width="1" fill="#5a5e7a" fill-opacity="0.1" />
+        </svg>
+        <span>调整参数以生成预览</span>
+      </div>
+    </div>
+    <ExportBar />
+
+    <PresetPanel v-if="showPresetPanel" @close="showPresetPanel = false" />
+
+    <!-- 工具箱面板 -->
+    <div v-if="showToolboxPanel" class="panel-overlay" @click.self="showToolboxPanel = false">
+      <div class="overlay-panel">
+        <div class="overlay-header">
+          <span class="overlay-title">工具箱</span>
+          <button class="close-btn" @click="showToolboxPanel = false">
+            <svg width="14" height="14" viewBox="0 0 14 14">
+              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+        <div class="overlay-body">
+          <div class="empty-hint">暂无工具</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导入图片面板 -->
+    <ImportPanel v-if="showImportPanel" @close="showImportPanel = false" />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useConfig } from '../../composables/useConfig'
@@ -69,7 +161,7 @@ watch(src, async (url) => {
   const r = await fetch(url)
   bitmap = await createImageBitmap(await r.blob())
   bw.value = bitmap.width; bh.value = bitmap.height
-  try { old?.close() } catch {}
+  try { old?.close() } catch { }
   if (!old) { zoom.value = 100; pan.value = { x: 0, y: Math.max(0, (bh.value * 2.5 - ch.value) / 2) } }
   paint()
 })
@@ -196,7 +288,7 @@ function drawAnno() {
 
   if (dh > 0) {
     const botY = dy + dh
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.setLineDash([2,6]); ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.setLineDash([2, 6]); ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(Math.max(0, dx), botY); ctx.lineTo(Math.min(cw.value, dx + dw), botY); ctx.stroke()
     ctx.setLineDash([])
     ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '10px sans-serif'
@@ -243,89 +335,33 @@ onUnmounted(() => ro?.disconnect())
 watch([s, cw, ch], paint, { flush: 'post' })
 </script>
 
-<template>
-  <div class="preview-panel">
-    <div class="topbar">
-      <div class="topbar-left">
-        <button class="topbar-trigger" @click="showToolboxPanel = true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <rect x="1" y="5" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.1"/>
-            <path d="M4 5V3a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
-            <line x1="7" y1="8" x2="7" y2="11" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
-          </svg>
-          工具箱
-        </button>
-        <button class="topbar-trigger" @click="showPresetPanel = true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
-            <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
-            <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
-            <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
-          </svg>
-          预设
-        </button>
-        <button class="topbar-trigger" @click="showImportPanel = true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v7M4 6.5 7 9.5 10 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 9v2.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
-          </svg>
-          导入图片
-        </button>
-        <button :class="['reset-trigger', { confirming: resetConfirming }]" @click="handleReset">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-            <path d="M2 7a5 5 0 0 1 9.33-2.5M12 7a5 5 0 0 1-9.33 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            <path d="M11.5 1.5v3h-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2.5 12.5v-3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          {{ resetConfirming ? '确认重置？' : (currentPreset ? `重置到"${currentPreset.name}"` : '重置') }}
-        </button>
-      </div>
-      <span class="st"><span :class="['dot', previewLoading ? 'ld' : 'ok']"></span>{{ previewLoading ? '渲染中' : '预览' }}</span>
-    </div>
-
-    <div ref="container" class="cv" @mousedown="onMD" @mousemove="onMM" @mouseup="onMU" @mouseleave="onMU" @wheel="onWh">
-      <canvas ref="mainCanvas" class="c1"></canvas>
-      <canvas ref="annoCanvas" class="c2"></canvas>
-      <div class="bg-wrap" @mousedown.stop @mouseup.stop>
-        <button class="bg-btn" @click="resetView">恢复视角</button>
-        <button class="bg-btn" @click="toggleBgMenu">切换背景</button>
-        <div v-if="bgMenuOpen" class="bg-drop">
-          <button v-for="m in bgModes" :key="m" :class="['bg-opt', { on: bgMode === m }]" @click="selectBg(m)">{{ bgLabels[m] }}</button>
-        </div>
-      </div>
-      <div v-if="!previewBase64 && !previewLoading" class="ph">
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none"><rect x="12" y="8" width="24" height="34" rx="3" stroke="#5a5e7a" stroke-width="1"/><path d="M12 16 A12 6 0 0 1 36 16" stroke="#5a5e7a" stroke-width="1" fill="#5a5e7a" fill-opacity="0.1"/></svg>
-        <span>调整参数以生成预览</span>
-      </div>
-    </div>
-    <ExportBar />
-
-    <PresetPanel v-if="showPresetPanel" @close="showPresetPanel = false" />
-
-    <!-- 工具箱面板 -->
-    <div v-if="showToolboxPanel" class="panel-overlay" @click.self="showToolboxPanel = false">
-      <div class="overlay-panel">
-        <div class="overlay-header">
-          <span class="overlay-title">工具箱</span>
-          <button class="close-btn" @click="showToolboxPanel = false">
-            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
-        </div>
-        <div class="overlay-body">
-          <div class="empty-hint">暂无工具</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 导入图片面板 -->
-    <ImportPanel v-if="showImportPanel" @close="showImportPanel = false" />
-  </div>
-</template>
-
 <style scoped>
-.preview-panel { flex:1; display:flex; flex-direction:column; height:100vh; overflow:hidden; background:var(--bg-base) }
-.topbar { display:flex; align-items:center; justify-content:space-between; padding:0 18px; height:44px; background:var(--bg-panel); border-bottom:1px solid var(--border-color); flex-shrink:0 }
-.topbar-left { display:flex; align-items:center; gap:6px }
+.preview-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-base)
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  height: 44px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px
+}
+
 .topbar-trigger {
   display: flex;
   align-items: center;
@@ -340,11 +376,13 @@ watch([s, cw, ch], paint, { flush: 'post' })
   cursor: pointer;
   transition: all 0.15s;
 }
+
 .topbar-trigger:hover {
   background: var(--bg-elevated);
   border-color: var(--accent-purple);
   color: var(--accent-purple);
 }
+
 .reset-trigger {
   display: flex;
   align-items: center;
@@ -359,16 +397,19 @@ watch([s, cw, ch], paint, { flush: 'post' })
   cursor: pointer;
   transition: all 0.15s;
 }
+
 .reset-trigger:hover {
   background: var(--bg-elevated);
   border-color: var(--text-muted);
   color: var(--text-secondary);
 }
+
 .reset-trigger.confirming {
   border-color: #ff4466;
   color: #ff4466;
   background: oklch(0.35 0.08 16 / 0.3);
 }
+
 .reset-trigger.confirming:hover {
   background: oklch(0.4 0.1 16 / 0.4);
 }
@@ -384,7 +425,17 @@ watch([s, cw, ch], paint, { flush: 'post' })
   justify-content: center;
   animation: panelFadeIn 0.2s ease-out;
 }
-@keyframes panelFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 .overlay-panel {
   width: 820px;
   max-width: 92vw;
@@ -398,7 +449,19 @@ watch([s, cw, ch], paint, { flush: 'post' })
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 212, 240, 0.3);
   animation: panelSlideUp 0.25s ease-out;
 }
-@keyframes panelSlideUp { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@keyframes panelSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .overlay-header {
   display: flex;
   align-items: center;
@@ -407,12 +470,14 @@ watch([s, cw, ch], paint, { flush: 'post' })
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
+
 .overlay-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: 0.3px;
 }
+
 .close-btn {
   width: 28px;
   height: 28px;
@@ -426,10 +491,12 @@ watch([s, cw, ch], paint, { flush: 'post' })
   justify-content: center;
   transition: all 0.15s;
 }
+
 .close-btn:hover {
   background: var(--bg-surface);
   color: var(--text-primary);
 }
+
 .overlay-body {
   flex: 1;
   overflow-y: auto;
@@ -438,27 +505,150 @@ watch([s, cw, ch], paint, { flush: 'post' })
   align-items: center;
   justify-content: center;
 }
+
 .empty-hint {
   color: var(--text-muted);
   font-size: 13px;
 }
 
-.st { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted) }
-.dot { width:6px; height:6px; border-radius:50% }
-.dot.ld { background:var(--accent-purple); animation:pulse 1.2s ease-in-out infinite }
-.dot.ok { background:#44ee88 }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-.cv { flex:1; position:relative; overflow:hidden; background:#070810; cursor:grab }
-.cv:active { cursor:grabbing }
-.c1,.c2 { position:absolute; top:0; left:0; width:100%; height:100% }
-.c2 { pointer-events:none }
-.ph { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--text-muted); font-size:13px; z-index:2 }
-.ph svg { opacity:.4 }
-.bg-wrap { position:absolute; top:8px; right:8px; z-index:10; display:flex; gap:4px }
-.bg-btn { padding:5px 10px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.15); border-radius:5px; color:rgba(255,255,255,0.65); font-size:12px; cursor:pointer; font-family:inherit; white-space:nowrap; line-height:1 }
-.bg-btn:hover { background:rgba(0,0,0,0.75); border-color:var(--accent-purple); color:var(--accent-purple) }
-.bg-drop { position:absolute; top:100%; right:0; margin-top:4px; background:rgba(15,17,29,0.95); border:1px solid var(--border-color); border-radius:5px; overflow:hidden; min-width:100px }
-.bg-opt { display:block; width:100%; padding:6px 14px; background:transparent; border:none; color:var(--text-secondary); font-size:12px; cursor:pointer; text-align:left; font-family:inherit; white-space:nowrap }
-.bg-opt:hover { background:var(--bg-surface); color:var(--text-primary) }
-.bg-opt.on { color:var(--accent-purple); background:var(--accent-purple-bg) }
+.st {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted)
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%
+}
+
+.dot.ld {
+  background: var(--accent-purple);
+  animation: pulse 1.2s ease-in-out infinite
+}
+
+.dot.ok {
+  background: #44ee88
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1
+  }
+
+  50% {
+    opacity: .3
+  }
+}
+
+.cv {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #070810;
+  cursor: grab
+}
+
+.cv:active {
+  cursor: grabbing
+}
+
+.c1,
+.c2 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%
+}
+
+.c2 {
+  pointer-events: none
+}
+
+.ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  z-index: 2
+}
+
+.ph svg {
+  opacity: .4
+}
+
+.bg-wrap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  gap: 4px
+}
+
+.bg-btn {
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  line-height: 1
+}
+
+.bg-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: var(--accent-purple);
+  color: var(--accent-purple)
+}
+
+.bg-drop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: rgba(15, 17, 29, 0.95);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  overflow: hidden;
+  min-width: 100px
+}
+
+.bg-opt {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  white-space: nowrap
+}
+
+.bg-opt:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary)
+}
+
+.bg-opt.on {
+  color: var(--accent-purple);
+  background: var(--accent-purple-bg)
+}
 </style>

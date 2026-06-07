@@ -1,25 +1,20 @@
-<script setup lang="ts">
-import { useNotification } from '../composables/useNotification'
-
-const { notifications } = useNotification()
-</script>
-
 <template>
   <Teleport to="body">
     <div class="toast-container">
       <TransitionGroup name="toast">
-        <div
-          v-for="n in notifications"
-          :key="n.id"
-          class="toast"
-          :class="`toast-${n.type}`"
-        >
+        <div v-for="n in notifications" :key="n.id" class="toast" :class="`toast-${n.type}`">
           {{ n.message }}
         </div>
       </TransitionGroup>
     </div>
   </Teleport>
 </template>
+
+<script setup lang="ts">
+import { useNotification } from '../composables/useNotification'
+
+const { notifications } = useNotification()
+</script>
 
 <style scoped>
 .toast-container {
@@ -67,17 +62,21 @@ const { notifications } = useNotification()
 .toast-enter-active {
   transition: all 0.25s ease-out;
 }
+
 .toast-leave-active {
   transition: all 0.25s ease-in;
   position: absolute;
 }
+
 .toast-move {
   transition: transform 0.25s ease;
 }
+
 .toast-enter-from {
   opacity: 0;
   transform: translateY(-10px);
 }
+
 .toast-leave-to {
   opacity: 0;
 }

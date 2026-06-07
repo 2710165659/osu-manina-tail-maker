@@ -1,3 +1,58 @@
+<template>
+  <div class="preset-overlay" @click.self="emit('close')">
+    <div class="preset-panel">
+      <div class="preset-header">
+        <span class="preset-title">预设</span>
+        <button class="close-btn" @click="emit('close')">
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="preset-grid">
+        <div v-for="preset in presets" :key="preset.name"
+          :class="['preset-card', { active: currentPreset?.name === preset.name }]" @click="handleLoad(preset)">
+          <div class="preset-thumb">
+            <span class="thumb-label">投：{{ preset.config.throwLength }}px</span>
+            <div v-if="loadingThumbs && !thumbnails.has(preset.name)" class="thumb-loading">
+              <span class="spinner"></span>
+            </div>
+            <img v-else-if="thumbnails.get(preset.name)" :src="thumbnails.get(preset.name)" class="thumb-img"
+              :alt="preset.name" />
+            <div v-else class="thumb-empty">—</div>
+          </div>
+          <div class="preset-meta">
+            <span class="preset-name">{{ preset.name }}</span>
+            <span v-if="preset.builtin" class="preset-badge">内置</span>
+            <button v-if="!preset.builtin" class="preset-delete" @click.stop="handleDelete(preset.name)" title="删除预设">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="preset-footer">
+        <div v-if="showSaveInput" class="save-row fade-in">
+          <input v-model="newPresetName" type="text" class="save-input" placeholder="预设名称..."
+            @keyup.enter="handleSave" />
+          <button :class="['footer-btn', { confirming: overwriteConfirming }]" @click="handleSave">{{
+            overwriteConfirming ? '确认覆盖？' : '保存' }}</button>
+          <button class="footer-btn" @click="showSaveInput = false; saveError = ''">取消</button>
+        </div>
+        <p v-if="saveError" class="error-text">{{ saveError }}</p>
+        <div class="footer-actions">
+          <button v-if="!showSaveInput" class="footer-btn" @click="showSaveInput = true">
+            + 保存当前为预设
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
@@ -104,77 +159,6 @@ onMounted(() => {
 })
 </script>
 
-<template>
-  <div class="preset-overlay" @click.self="emit('close')">
-    <div class="preset-panel">
-      <div class="preset-header">
-        <span class="preset-title">预设</span>
-        <button class="close-btn" @click="emit('close')">
-          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        </button>
-      </div>
-
-      <div class="preset-grid">
-        <div
-          v-for="preset in presets"
-          :key="preset.name"
-          :class="['preset-card', { active: currentPreset?.name === preset.name }]"
-          @click="handleLoad(preset)"
-        >
-          <div class="preset-thumb">
-            <span class="thumb-label">投：{{ preset.config.throwLength }}px</span>
-            <div v-if="loadingThumbs && !thumbnails.has(preset.name)" class="thumb-loading">
-              <span class="spinner"></span>
-            </div>
-            <img
-              v-else-if="thumbnails.get(preset.name)"
-              :src="thumbnails.get(preset.name)"
-              class="thumb-img"
-              :alt="preset.name"
-            />
-            <div v-else class="thumb-empty">—</div>
-          </div>
-          <div class="preset-meta">
-            <span class="preset-name">{{ preset.name }}</span>
-            <span v-if="preset.builtin" class="preset-badge">内置</span>
-            <button
-              v-if="!preset.builtin"
-              class="preset-delete"
-              @click.stop="handleDelete(preset.name)"
-              title="删除预设"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="preset-footer">
-        <div v-if="showSaveInput" class="save-row fade-in">
-          <input
-            v-model="newPresetName"
-            type="text"
-            class="save-input"
-            placeholder="预设名称..."
-            @keyup.enter="handleSave"
-          />
-          <button
-            :class="['footer-btn', { confirming: overwriteConfirming }]"
-            @click="handleSave"
-          >{{ overwriteConfirming ? '确认覆盖？' : '保存' }}</button>
-          <button class="footer-btn" @click="showSaveInput = false; saveError = ''">取消</button>
-        </div>
-        <p v-if="saveError" class="error-text">{{ saveError }}</p>
-        <div class="footer-actions">
-          <button v-if="!showSaveInput" class="footer-btn" @click="showSaveInput = true">
-            + 保存当前为预设
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <style scoped>
 .preset-overlay {
   position: fixed;
@@ -187,7 +171,16 @@ onMounted(() => {
   justify-content: center;
   animation: fadeIn 0.2s ease-out;
 }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
 
 .preset-panel {
   width: 820px;
@@ -202,7 +195,18 @@ onMounted(() => {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 212, 240, 0.3);
   animation: slideUp 0.25s ease-out;
 }
-@keyframes slideUp { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 
 .preset-header {
   display: flex;
@@ -212,12 +216,14 @@ onMounted(() => {
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
+
 .preset-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: 0.3px;
 }
+
 .close-btn {
   width: 28px;
   height: 28px;
@@ -231,6 +237,7 @@ onMounted(() => {
   justify-content: center;
   transition: all 0.15s;
 }
+
 .close-btn:hover {
   background: var(--bg-surface);
   color: var(--text-primary);
@@ -261,11 +268,13 @@ onMounted(() => {
   transition: all 0.15s;
   overflow: hidden;
 }
+
 .preset-card:hover {
   background: var(--bg-surface);
   border-color: var(--accent-purple);
   box-shadow: 0 0 16px rgba(183, 108, 241, 0.1);
 }
+
 .preset-card.active {
   border-color: var(--accent-purple);
   background: var(--accent-purple-bg);
@@ -283,6 +292,7 @@ onMounted(() => {
   justify-content: center;
   position: relative;
 }
+
 .thumb-label {
   position: absolute;
   top: 4px;
@@ -297,17 +307,20 @@ onMounted(() => {
   z-index: 1;
   letter-spacing: -0.2px;
 }
+
 .thumb-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   image-rendering: pixelated;
 }
+
 .thumb-loading {
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .spinner {
   width: 16px;
   height: 16px;
@@ -316,7 +329,13 @@ onMounted(() => {
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .thumb-empty {
   color: var(--text-muted);
   font-size: 12px;
@@ -329,6 +348,7 @@ onMounted(() => {
   padding: 7px 8px;
   min-width: 0;
 }
+
 .preset-name {
   font-size: 11px;
   color: var(--text-primary);
@@ -339,6 +359,7 @@ onMounted(() => {
   flex: 1;
   min-width: 0;
 }
+
 .preset-badge {
   font-size: 8px;
   padding: 1px 5px;
@@ -349,6 +370,7 @@ onMounted(() => {
   letter-spacing: 0.5px;
   flex-shrink: 0;
 }
+
 .preset-delete {
   width: 18px;
   height: 18px;
@@ -363,6 +385,7 @@ onMounted(() => {
   transition: all 0.15s;
   flex-shrink: 0;
 }
+
 .preset-delete:hover {
   background: oklch(0.5 0.16 16 / 0.2);
   color: #ff4466;
@@ -373,12 +396,14 @@ onMounted(() => {
   padding: 10px 14px;
   flex-shrink: 0;
 }
+
 .save-row {
   display: flex;
   gap: 6px;
   align-items: center;
   margin-bottom: 6px;
 }
+
 .save-input {
   flex: 1;
   padding: 5px 10px;
@@ -390,16 +415,22 @@ onMounted(() => {
   font-family: inherit;
   outline: none;
 }
-.save-input:focus { border-color: var(--accent-purple); }
+
+.save-input:focus {
+  border-color: var(--accent-purple);
+}
+
 .error-text {
   color: #ff4466;
   font-size: 11px;
   margin: 4px 0;
 }
+
 .footer-actions {
   display: flex;
   gap: 6px;
 }
+
 .footer-btn {
   padding: 5px 12px;
   font-size: 12px;
@@ -412,42 +443,72 @@ onMounted(() => {
   transition: all 0.15s;
   white-space: nowrap;
 }
+
 .footer-btn:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
   border-color: var(--accent-purple);
 }
+
 .footer-btn.primary {
   background: var(--accent-purple);
   border-color: var(--accent-purple);
   color: #fff;
   font-weight: 600;
 }
+
 .footer-btn.primary:hover {
   background: var(--accent-purple-light);
 }
+
 .footer-btn.confirming {
   border-color: #ff4466;
   color: #ff4466;
   background: oklch(0.35 0.08 16 / 0.3);
 }
+
 .footer-btn.confirming:hover {
   background: oklch(0.4 0.1 16 / 0.4);
 }
+
 .footer-btn.ghost {
   background: transparent;
   border-color: transparent;
   color: var(--text-muted);
 }
+
 .footer-btn.ghost:hover {
   color: var(--text-primary);
   background: var(--bg-surface);
 }
-.fade-in { animation: fadeSlideIn 0.25s ease-out; }
-@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+.fade-in {
+  animation: fadeSlideIn 0.25s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 /* scrollbar */
-.preset-grid::-webkit-scrollbar { width: 4px; }
-.preset-grid::-webkit-scrollbar-track { background: transparent; }
-.preset-grid::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+.preset-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.preset-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.preset-grid::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
 </style>

@@ -1,86 +1,11 @@
-<script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useConfig } from '../../composables/useConfig'
-import { rgbaToHex, hexToRgba } from '../../types/config'
-import RevertButton from './RevertButton.vue'
-
-const { config, resetField, setBodyProp, resetBodyField, isFieldDefault } = useConfig()
-
-const marginMax = computed(() => Math.floor((config.image.width - 1) / 2))
-const contentWidth = computed(() => config.image.width - config.margin * 2)
-const marginStr = ref(String(config.margin))
-watch(() => config.margin, (v) => { marginStr.value = String(v) })
-function applyMargin() {
-  const v = parseInt(marginStr.value)
-  if (!isNaN(v)) config.margin = Math.max(0, Math.min(marginMax.value, v))
-  else marginStr.value = String(config.margin)
-}
-
-const throwMax = computed(() => Math.max(0, config.image.height - 1))
-const throwStr = ref(String(config.throwLength))
-watch(() => config.throwLength, (v) => { throwStr.value = String(v) })
-function applyThrow() {
-  const v = parseInt(throwStr.value)
-  if (!isNaN(v)) config.throwLength = Math.max(0, Math.min(throwMax.value, v))
-  else throwStr.value = String(config.throwLength)
-}
-
-const colorHex = ref(rgbaToHex(config.globalColor))
-watch(() => config.globalColor, (c) => { colorHex.value = rgbaToHex(c) })
-function applyHex(v: string) {
-  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
-  if (clean.length > 6) clean = clean.slice(0, 6)
-  if (clean.length === 1) clean = clean.repeat(6)
-  else if (clean.length === 2) clean = clean.repeat(3)
-  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
-  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
-  if (clean.length === 6) {
-    config.globalColor = hexToRgba('#' + clean)
-    colorHex.value = '#' + clean
-  }
-}
-
-const opacityVal = ref(config.globalOpacity)
-watch(() => config.globalOpacity, (v) => { opacityVal.value = v })
-function applyOpacity() { config.globalOpacity = Math.max(0, Math.min(255, opacityVal.value)) }
-const opacityPct = computed(() => Math.round((opacityVal.value / 255) * 100))
-
-// 边框
-const bHex = ref(rgbaToHex(config.body.borderColor))
-watch(() => config.body.borderColor, (c) => { bHex.value = rgbaToHex(c) })
-function applyBorderHex(v: string) {
-  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
-  if (clean.length > 6) clean = clean.slice(0, 6)
-  if (clean.length === 1) clean = clean.repeat(6)
-  else if (clean.length === 2) clean = clean.repeat(3)
-  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
-  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
-  if (clean.length === 6) {
-    config.body.borderColor = hexToRgba('#' + clean, config.body.borderColor.a)
-    bHex.value = '#' + clean
-  }
-}
-const borderOpacityVal = ref(config.body.borderOpacity)
-watch(() => config.body.borderOpacity, (v) => { borderOpacityVal.value = v })
-function applyBorderOpacity() { setBodyProp('borderOpacity', Math.max(0, Math.min(255, borderOpacityVal.value))) }
-const borderOpacityPct = computed(() => Math.round((borderOpacityVal.value / 255) * 100))
-const borderStr = ref(String(config.body.borderWidth))
-watch(() => config.body.borderWidth, (v) => { borderStr.value = String(v) })
-function applyBorderWidth() {
-  const v = parseInt(borderStr.value)
-  if (!isNaN(v)) setBodyProp('borderWidth', Math.max(1, v))
-  else borderStr.value = String(config.body.borderWidth)
-}
-</script>
-
 <template>
   <section class="config-section">
     <h3 class="section-title">
       <svg width="14" height="14" viewBox="0 0 14 14" class="section-icon-svg">
-        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
-        <rect x="4" y="4" width="6" height="6" rx="1" fill="currentColor" opacity="0.25"/>
-        <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
-        <line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
+        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.2" />
+        <rect x="4" y="4" width="6" height="6" rx="1" fill="currentColor" opacity="0.25" />
+        <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="0.5" opacity="0.4" />
+        <line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="0.5" opacity="0.4" />
       </svg>
       整体外观
     </h3>
@@ -88,10 +13,11 @@ function applyBorderWidth() {
     <div class="field">
       <div class="label-row">
         <label class="field-label">留白 <span class="unit">px</span> <span class="field-hint">（左右对称）</span></label>
-        <RevertButton :visible="!isFieldDefault( 'margin')" @revert="resetField('margin')" />
+        <RevertButton :visible="!isFieldDefault('margin')" @revert="resetField('margin')" />
       </div>
       <div class="input-wrap">
-        <input v-model="marginStr" type="text" inputmode="numeric" class="num-input" @blur="applyMargin" @keyup.enter="applyMargin" />
+        <input v-model="marginStr" type="text" inputmode="numeric" class="num-input" @blur="applyMargin"
+          @keyup.enter="applyMargin" />
       </div>
       <div class="field-info">内容区宽度: <strong>{{ contentWidth }}px</strong></div>
     </div>
@@ -99,28 +25,31 @@ function applyBorderWidth() {
     <div class="field">
       <div class="label-row">
         <label class="field-label">投的长度 <span class="unit">px</span></label>
-        <RevertButton :visible="!isFieldDefault( 'throwLength')" @revert="resetField('throwLength')" />
+        <RevertButton :visible="!isFieldDefault('throwLength')" @revert="resetField('throwLength')" />
       </div>
       <div class="input-wrap">
-        <input v-model="throwStr" type="text" inputmode="numeric" class="num-input" @blur="applyThrow" @keyup.enter="applyThrow" />
+        <input v-model="throwStr" type="text" inputmode="numeric" class="num-input" @blur="applyThrow"
+          @keyup.enter="applyThrow" />
       </div>
     </div>
 
     <div class="field">
       <div class="label-row">
         <label class="field-label">颜色</label>
-        <RevertButton :visible="!isFieldDefault( 'globalColor')" @revert="resetField('globalColor')" />
+        <RevertButton :visible="!isFieldDefault('globalColor')" @revert="resetField('globalColor')" />
       </div>
       <div class="color-row">
-        <input type="color" :value="rgbaToHex(config.globalColor)" class="color-picker" @input="applyHex(($event.target as HTMLInputElement).value)" />
-        <input v-model="colorHex" class="hex-input" maxlength="7" @blur="applyHex(colorHex)" @keyup.enter="applyHex(colorHex)" />
+        <input type="color" :value="rgbaToHex(config.globalColor)" class="color-picker"
+          @input="applyHex(($event.target as HTMLInputElement).value)" />
+        <input v-model="colorHex" class="hex-input" maxlength="7" @blur="applyHex(colorHex)"
+          @keyup.enter="applyHex(colorHex)" />
       </div>
     </div>
 
     <div class="field">
       <div class="label-row">
         <label class="field-label">透明度</label>
-        <RevertButton :visible="!isFieldDefault( 'globalOpacity')" @revert="resetField('globalOpacity')" />
+        <RevertButton :visible="!isFieldDefault('globalOpacity')" @revert="resetField('globalOpacity')" />
       </div>
       <div class="slider-row">
         <input v-model.number="opacityVal" type="range" min="0" max="255" class="slider" @change="applyOpacity" />
@@ -164,25 +93,158 @@ function applyBorderWidth() {
 
         <div class="other-label">粗细 <span class="unit">px</span></div>
         <div class="input-wrap">
-          <input v-model="borderStr" type="text" inputmode="numeric" class="num-input narrow" @blur="applyBorderWidth" @keyup.enter="applyBorderWidth" />
+          <input v-model="borderStr" type="text" inputmode="numeric" class="num-input narrow" @blur="applyBorderWidth"
+            @keyup.enter="applyBorderWidth" />
         </div>
       </div>
     </div>
   </section>
 </template>
 
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useConfig } from '../../composables/useConfig'
+import { rgbaToHex, hexToRgba } from '../../types/config'
+import RevertButton from './RevertButton.vue'
+
+const { config, resetField, setBodyProp, resetBodyField, isFieldDefault } = useConfig()
+
+const marginMax = computed(() => Math.floor((config.image.width - 1) / 2))
+const contentWidth = computed(() => config.image.width - config.margin * 2)
+const marginStr = ref(String(config.margin))
+watch(() => config.margin, (v) => { marginStr.value = String(v) })
+function applyMargin() {
+  const v = parseInt(marginStr.value)
+  if (!isNaN(v)) config.margin = Math.max(0, Math.min(marginMax.value, v))
+  else marginStr.value = String(config.margin)
+}
+
+const throwMax = computed(() => Math.max(0, config.image.height - 1))
+const throwStr = ref(String(config.throwLength))
+watch(() => config.throwLength, (v) => { throwStr.value = String(v) })
+function applyThrow() {
+  const v = parseInt(throwStr.value)
+  if (!isNaN(v)) config.throwLength = Math.max(0, Math.min(throwMax.value, v))
+  else throwStr.value = String(config.throwLength)
+}
+
+const colorHex = ref(rgbaToHex(config.globalColor))
+watch(() => config.globalColor, (c) => { colorHex.value = rgbaToHex(c) })
+function applyHex(v: string) {
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.globalColor = hexToRgba('#' + clean)
+    colorHex.value = '#' + clean
+  }
+}
+
+const opacityVal = ref(config.globalOpacity)
+watch(() => config.globalOpacity, (v) => { opacityVal.value = v })
+function applyOpacity() { config.globalOpacity = Math.max(0, Math.min(255, opacityVal.value)) }
+const opacityPct = computed(() => Math.round((opacityVal.value / 255) * 100))
+
+// 边框
+const bHex = ref(rgbaToHex(config.body.borderColor))
+watch(() => config.body.borderColor, (c) => { bHex.value = rgbaToHex(c) })
+function applyBorderHex(v: string) {
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.body.borderColor = hexToRgba('#' + clean, config.body.borderColor.a)
+    bHex.value = '#' + clean
+  }
+}
+const borderOpacityVal = ref(config.body.borderOpacity)
+watch(() => config.body.borderOpacity, (v) => { borderOpacityVal.value = v })
+function applyBorderOpacity() { setBodyProp('borderOpacity', Math.max(0, Math.min(255, borderOpacityVal.value))) }
+const borderOpacityPct = computed(() => Math.round((borderOpacityVal.value / 255) * 100))
+const borderStr = ref(String(config.body.borderWidth))
+watch(() => config.body.borderWidth, (v) => { borderStr.value = String(v) })
+function applyBorderWidth() {
+  const v = parseInt(borderStr.value)
+  if (!isNaN(v)) setBodyProp('borderWidth', Math.max(1, v))
+  else borderStr.value = String(config.body.borderWidth)
+}
+</script>
+
 <style scoped>
-.section-icon-svg { color: var(--accent-purple); flex-shrink: 0; }
-.label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.slider-row { display: flex; align-items: center; gap: 8px; }
-.slider { flex: 1; }
-.slider:disabled { opacity: 0.35; cursor: not-allowed; }
-.color-row { display: flex; align-items: center; gap: 6px; }
-.color-picker { width: 30px; height: 30px; border: 2px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; background: transparent; padding: 2px; }
-.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
-.color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
-.hex-input { width: 72px; padding: 4px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
-.hex-input:focus { border-color: var(--accent-purple); }
+.section-icon-svg {
+  color: var(--accent-purple);
+  flex-shrink: 0;
+}
+
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider {
+  flex: 1;
+}
+
+.slider:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-picker {
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: transparent;
+  padding: 2px;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+  border-radius: 2px;
+  border: none;
+}
+
+.hex-input {
+  width: 72px;
+  padding: 4px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  letter-spacing: 0.5px;
+}
+
+.hex-input:focus {
+  border-color: var(--accent-purple);
+}
 
 .subsection {
   margin-top: 10px;
@@ -300,6 +362,7 @@ function applyBorderWidth() {
     opacity: 0;
     transform: translateY(-4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

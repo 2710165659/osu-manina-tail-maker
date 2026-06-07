@@ -1,3 +1,60 @@
+<template>
+  <div class="export-bar">
+    <!-- 客户端切换提示 -->
+    <Transition name="tip-fade">
+      <div v-if="clientTip" class="client-tip-banner">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1" />
+          <path
+            d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z"
+            fill="currentColor" />
+        </svg>
+        {{ clientTip }}
+      </div>
+    </Transition>
+
+    <!-- 二次确认弹窗 -->
+    <Transition name="confirm-fade">
+      <div v-if="showConfirm" class="confirm-overlay" @click.self="cancelExport">
+        <div class="confirm-dialog">
+          <div class="confirm-icon">⚠</div>
+          <p class="confirm-message">{{ confirmMessage }}</p>
+          <div class="confirm-actions">
+            <button class="btn btn-sm" @click="cancelExport">取消</button>
+            <button class="btn btn-sm btn-primary" @click="confirmExport">继续导出</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <div class="export-info">
+      <span class="export-filename">{{ displayFilename }}</span>
+      <span class="export-dims">{{ config.image.width }}×{{ config.image.height }}</span>
+    </div>
+    <div class="export-actions">
+      <!-- 客户端模式切换 -->
+      <div class="client-mode-switch">
+        <button class="client-btn" :class="{ active: clientMode === 'lazer' }"
+          @click="clientMode = 'lazer'">lazer</button>
+        <button class="client-btn" :class="{ active: clientMode === 'stable' }"
+          @click="clientMode = 'stable'">stable</button>
+      </div>
+      <!-- 2x 选项 -->
+      <label class="scale-option" title="勾选后文件名添加 @2x 后缀（不进行实际放大）">
+        <input type="checkbox" v-model="is2x" class="scale-checkbox" />
+        <span class="scale-label">2x</span>
+      </label>
+      <span v-if="exportStatus === 'success'" class="export-msg success">✓ {{ exportMessage }}</span>
+      <span v-if="exportStatus === 'error'" class="export-msg error">✗ {{ exportMessage }}</span>
+      <button class="btn btn-primary btn-export" :disabled="exporting" @click="handleExport">
+        <span v-if="exporting" class="spinner"></span>
+        <span v-else>⬇</span>
+        导出 PNG
+      </button>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
@@ -131,63 +188,6 @@ async function doExport() {
   }
 }
 </script>
-
-<template>
-  <div class="export-bar">
-    <!-- 客户端切换提示 -->
-    <Transition name="tip-fade">
-      <div v-if="clientTip" class="client-tip-banner">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1" />
-          <path
-            d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z"
-            fill="currentColor" />
-        </svg>
-        {{ clientTip }}
-      </div>
-    </Transition>
-
-    <!-- 二次确认弹窗 -->
-    <Transition name="confirm-fade">
-      <div v-if="showConfirm" class="confirm-overlay" @click.self="cancelExport">
-        <div class="confirm-dialog">
-          <div class="confirm-icon">⚠</div>
-          <p class="confirm-message">{{ confirmMessage }}</p>
-          <div class="confirm-actions">
-            <button class="btn btn-sm" @click="cancelExport">取消</button>
-            <button class="btn btn-sm btn-primary" @click="confirmExport">继续导出</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <div class="export-info">
-      <span class="export-filename">{{ displayFilename }}</span>
-      <span class="export-dims">{{ config.image.width }}×{{ config.image.height }}</span>
-    </div>
-    <div class="export-actions">
-      <!-- 客户端模式切换 -->
-      <div class="client-mode-switch">
-        <button class="client-btn" :class="{ active: clientMode === 'lazer' }"
-          @click="clientMode = 'lazer'">lazer</button>
-        <button class="client-btn" :class="{ active: clientMode === 'stable' }"
-          @click="clientMode = 'stable'">stable</button>
-      </div>
-      <!-- 2x 选项 -->
-      <label class="scale-option" title="勾选后文件名添加 @2x 后缀（不进行实际放大）">
-        <input type="checkbox" v-model="is2x" class="scale-checkbox" />
-        <span class="scale-label">2x</span>
-      </label>
-      <span v-if="exportStatus === 'success'" class="export-msg success">✓ {{ exportMessage }}</span>
-      <span v-if="exportStatus === 'error'" class="export-msg error">✗ {{ exportMessage }}</span>
-      <button class="btn btn-primary btn-export" :disabled="exporting" @click="handleExport">
-        <span v-if="exporting" class="spinner"></span>
-        <span v-else>⬇</span>
-        导出 PNG
-      </button>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .export-bar {

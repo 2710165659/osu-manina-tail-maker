@@ -1,3 +1,128 @@
+<template>
+  <div class="panel-overlay" @click.self="emit('close')">
+    <div class="import-panel">
+      <div class="panel-header">
+        <span class="panel-title">导入图片</span>
+        <button class="close-btn" @click="emit('close')">
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="panel-body">
+        <!-- 左列：原图 -->
+        <div ref="colLeftRef" class="col col-left" :style="{ height: midHeight + 'px' }">
+          <div class="col-title">原图顶部</div>
+          <div class="img-area" @click="handleSelectFile">
+            <img v-if="previewUrl" :src="previewUrl" class="img-preview" />
+            <div v-else class="img-placeholder">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v10M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                  stroke-linejoin="round" />
+                <path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" />
+              </svg>
+              <span>点击选择图片</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 中列：警告 + 解析信息 -->
+        <div ref="colMidRef" class="col col-mid">
+          <div class="col-title">解析信息
+            <span v-if="debugInfo.length" class="debug-hint">?
+              <span class="debug-tooltip">{{ debugInfo.join('\n') }}</span>
+            </span>
+          </div>
+          <div class="info-scroll">
+            <!-- 未上传时提示 -->
+            <div v-if="!parsedConfig && !loading && !error" class="info-notice">
+              <p>请先上传图片以进行解析。</p>
+              <p>只能解析图片尺寸和整体外观。</p>
+              <p>边框，球皮检测效果不是很好，需手动调整。</p>
+            </div>
+
+            <!-- 加载中 -->
+            <div v-if="loading" class="info-loading">
+              <div class="spinner"></div>
+              <span>解析中...</span>
+            </div>
+
+            <!-- 错误 -->
+            <div v-if="error" class="info-error">{{ error }}</div>
+
+            <!-- 警告 -->
+            <div v-if="warnings.length" class="info-section warn-section">
+              <div class="sec-title">⚠️ 警告</div>
+              <div v-for="(w, i) in warnings" :key="i" class="warn-item">{{ w }}</div>
+            </div>
+
+            <!-- 解析结果 -->
+            <template v-if="parsedConfig">
+              <!-- 图片尺寸 -->
+              <div class="info-section">
+                <div class="sec-title">图片尺寸</div>
+                <div class="kv"><span class="k">宽度</span><span class="v">{{ parsedConfig.image.width }}px</span></div>
+                <div class="kv"><span class="k">高度</span><span class="v">{{ parsedConfig.image.height }}px</span></div>
+              </div>
+
+              <!-- 整体外观 -->
+              <div class="info-section">
+                <div class="sec-title">整体外观</div>
+                <div class="kv"><span class="k">留白</span><span class="v">{{ parsedConfig.margin }}px</span></div>
+                <div class="kv"><span class="k">投的长度</span><span class="v">{{ parsedConfig.throwLength }}px</span></div>
+                <div class="kv">
+                  <span class="k">颜色</span>
+                  <span class="v"><span class="color-dot"
+                      :style="{ background: colorStr(parsedConfig.globalColor) }"></span>{{ parsedConfig.globalColor.r
+                      }}, {{ parsedConfig.globalColor.g }}, {{ parsedConfig.globalColor.b }}</span>
+                </div>
+                <div class="kv"><span class="k">透明度</span><span class="v">{{ Math.round(parsedConfig.globalOpacity / 255
+                  * 100) }}%</span></div>
+                <div class="kv"><span class="k">边框</span><span class="v">{{ parsedConfig.body.borderEnabled ?
+                  `${parsedConfig.body.borderWidth}px` : '无' }}</span></div>
+              </div>
+
+              <!-- 顶端 -->
+              <div class="info-section">
+                <div class="sec-title">顶端</div>
+                <div class="kv"><span class="k">形状</span><span class="v">{{ formatShape(parsedConfig.cap.shape)
+                }}</span></div>
+                <div class="kv"><span class="k">缩放</span><span class="v">{{ parsedConfig.cap.scale }}%</span></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 右列：渲染效果 -->
+        <div ref="colRightRef" class="col col-right" :style="{ height: midHeight + 'px' }">
+          <div class="col-title">渲染效果</div>
+          <div class="img-area">
+            <img v-if="renderPreview" :src="renderPreview" class="img-preview" />
+            <div v-else class="img-placeholder dim">
+              <span>待解析</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部 -->
+      <div class="panel-footer">
+        <div class="footer-left">
+          <label class="name-label">预设名称</label>
+          <input v-model="presetName" class="name-input" type="text" placeholder="输入预设名称" />
+        </div>
+        <div class="footer-right">
+          <button class="btn cancel" @click="emit('close')">取消</button>
+          <button :class="['btn', overwriteConfirming ? 'confirming' : 'save']" :disabled="!parsedConfig || !presetName"
+            @click="handleSave">{{ overwriteConfirming ? '确认覆盖？' : '保存到预设' }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useConfig } from '../../composables/useConfig'
@@ -140,131 +265,6 @@ function colorStr(c: { r: number; g: number; b: number }) {
   return `rgb(${c.r}, ${c.g}, ${c.b})`
 }
 </script>
-
-<template>
-  <div class="panel-overlay" @click.self="emit('close')">
-    <div class="import-panel">
-      <div class="panel-header">
-        <span class="panel-title">导入图片</span>
-        <button class="close-btn" @click="emit('close')">
-          <svg width="14" height="14" viewBox="0 0 14 14">
-            <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="panel-body">
-        <!-- 左列：原图 -->
-        <div ref="colLeftRef" class="col col-left" :style="{ height: midHeight + 'px' }">
-          <div class="col-title">原图顶部</div>
-          <div class="img-area" @click="handleSelectFile">
-            <img v-if="previewUrl" :src="previewUrl" class="img-preview" />
-            <div v-else class="img-placeholder">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5v10M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                  stroke-linejoin="round" />
-                <path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.5"
-                  stroke-linecap="round" />
-              </svg>
-              <span>点击选择图片</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 中列：警告 + 解析信息 -->
-        <div ref="colMidRef" class="col col-mid">
-          <div class="col-title">解析信息
-            <span v-if="debugInfo.length" class="debug-hint">?
-              <span class="debug-tooltip">{{ debugInfo.join('\n') }}</span>
-            </span>
-          </div>
-          <div class="info-scroll">
-            <!-- 未上传时提示 -->
-            <div v-if="!parsedConfig && !loading && !error" class="info-notice">
-              <p>请先上传图片以进行解析。</p>
-              <p>只能解析图片尺寸和整体外观。</p>
-              <p>边框，球皮检测效果不是很好，需手动调整。</p>
-            </div>
-
-            <!-- 加载中 -->
-            <div v-if="loading" class="info-loading">
-              <div class="spinner"></div>
-              <span>解析中...</span>
-            </div>
-
-            <!-- 错误 -->
-            <div v-if="error" class="info-error">{{ error }}</div>
-
-            <!-- 警告 -->
-            <div v-if="warnings.length" class="info-section warn-section">
-              <div class="sec-title">⚠️ 警告</div>
-              <div v-for="(w, i) in warnings" :key="i" class="warn-item">{{ w }}</div>
-            </div>
-
-            <!-- 解析结果 -->
-            <template v-if="parsedConfig">
-              <!-- 图片尺寸 -->
-              <div class="info-section">
-                <div class="sec-title">图片尺寸</div>
-                <div class="kv"><span class="k">宽度</span><span class="v">{{ parsedConfig.image.width }}px</span></div>
-                <div class="kv"><span class="k">高度</span><span class="v">{{ parsedConfig.image.height }}px</span></div>
-              </div>
-
-              <!-- 整体外观 -->
-              <div class="info-section">
-                <div class="sec-title">整体外观</div>
-                <div class="kv"><span class="k">留白</span><span class="v">{{ parsedConfig.margin }}px</span></div>
-                <div class="kv"><span class="k">投的长度</span><span class="v">{{ parsedConfig.throwLength }}px</span></div>
-                <div class="kv">
-                  <span class="k">颜色</span>
-                  <span class="v"><span class="color-dot"
-                      :style="{ background: colorStr(parsedConfig.globalColor) }"></span>{{ parsedConfig.globalColor.r
-                      }}, {{ parsedConfig.globalColor.g }}, {{ parsedConfig.globalColor.b }}</span>
-                </div>
-                <div class="kv"><span class="k">透明度</span><span class="v">{{ Math.round(parsedConfig.globalOpacity / 255
-                  * 100) }}%</span></div>
-                <div class="kv"><span class="k">边框</span><span class="v">{{ parsedConfig.body.borderEnabled ?
-                  `${parsedConfig.body.borderWidth}px` : '无' }}</span></div>
-              </div>
-
-              <!-- 顶端 -->
-              <div class="info-section">
-                <div class="sec-title">顶端</div>
-                <div class="kv"><span class="k">形状</span><span class="v">{{ formatShape(parsedConfig.cap.shape)
-                }}</span></div>
-                <div class="kv"><span class="k">缩放</span><span class="v">{{ parsedConfig.cap.scale }}%</span></div>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <!-- 右列：渲染效果 -->
-        <div ref="colRightRef" class="col col-right" :style="{ height: midHeight + 'px' }">
-          <div class="col-title">渲染效果</div>
-          <div class="img-area">
-            <img v-if="renderPreview" :src="renderPreview" class="img-preview" />
-            <div v-else class="img-placeholder dim">
-              <span>待解析</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 底部 -->
-      <div class="panel-footer">
-        <div class="footer-left">
-          <label class="name-label">预设名称</label>
-          <input v-model="presetName" class="name-input" type="text" placeholder="输入预设名称" />
-        </div>
-        <div class="footer-right">
-          <button class="btn cancel" @click="emit('close')">取消</button>
-          <button :class="['btn', overwriteConfirming ? 'confirming' : 'save']" :disabled="!parsedConfig || !presetName"
-            @click="handleSave">{{ overwriteConfirming ? '确认覆盖？' : '保存到预设' }}</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .panel-overlay {

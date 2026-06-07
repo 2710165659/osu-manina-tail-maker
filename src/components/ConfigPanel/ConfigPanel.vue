@@ -1,20 +1,3 @@
-<script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import ImageSection from './ImageSection.vue'
-import GlobalAppearanceSection from './GlobalAppearanceSection.vue'
-import CapSection from './CapSection.vue'
-import BodySection from './BodySection.vue'
-import EffectSection from './EffectSection.vue'
-
-const loaded = ref(false)
-onMounted(() => { loaded.value = true })
-
-function openGitHub() {
-  invoke('open_url', { url: 'https://github.com/2710165659/osu-manina-tail-maker' })
-}
-</script>
-
 <template>
   <aside class="config-panel">
     <div class="panel-header">
@@ -80,6 +63,23 @@ function openGitHub() {
     </div>
   </aside>
 </template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import ImageSection from './ImageSection.vue'
+import GlobalAppearanceSection from './GlobalAppearanceSection.vue'
+import CapSection from './CapSection.vue'
+import BodySection from './BodySection.vue'
+import EffectSection from './EffectSection.vue'
+
+const loaded = ref(false)
+onMounted(() => { loaded.value = true })
+
+function openGitHub() {
+  invoke('open_url', { url: 'https://github.com/2710165659/osu-manina-tail-maker' })
+}
+</script>
 
 <style scoped>
 .config-panel {

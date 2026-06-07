@@ -1,3 +1,11 @@
+<template>
+  <div class="app-shell">
+    <PreviewPanel />
+    <ConfigPanel />
+    <NotificationToast />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useConfig } from './composables/useConfig'
@@ -12,14 +20,6 @@ onMounted(async () => {
   loadUserPresets()
 })
 </script>
-
-<template>
-  <div class="app-shell">
-    <PreviewPanel />
-    <ConfigPanel />
-    <NotificationToast />
-  </div>
-</template>
 
 <style scoped>
 .app-shell {
