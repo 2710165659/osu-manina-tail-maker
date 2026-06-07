@@ -1,5 +1,5 @@
 <template>
-  <div class="tool-overlay" @click.self="emit('close')">
+  <div class="tool-overlay" @mousedown.self="emit('close')">
     <div class="tool-panel">
       <!-- 顶部装饰条 -->
       <div class="panel-stripe"></div>

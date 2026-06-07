@@ -1,5 +1,5 @@
 <template>
-  <div class="preset-overlay" @click.self="emit('close')">
+  <div class="preset-overlay" @mousedown.self="emit('close')">
     <div class="preset-panel">
       <div class="preset-header">
         <span class="preset-title">预设</span>

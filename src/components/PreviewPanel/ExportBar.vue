@@ -15,7 +15,7 @@
 
     <!-- 二次确认弹窗 -->
     <Transition name="confirm-fade">
-      <div v-if="showConfirm" class="confirm-overlay" @click.self="cancelExport">
+      <div v-if="showConfirm" class="confirm-overlay" @mousedown.self="cancelExport">
         <div class="confirm-dialog">
           <div class="confirm-icon">⚠</div>
           <p class="confirm-message">{{ confirmMessage }}</p>

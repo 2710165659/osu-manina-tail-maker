@@ -1,5 +1,5 @@
 <template>
-  <div class="panel-overlay" @click.self="emit('close')">
+  <div class="panel-overlay" @mousedown.self="emit('close')">
     <div class="import-panel">
       <div class="panel-header">
         <span class="panel-title">导入图片</span>
