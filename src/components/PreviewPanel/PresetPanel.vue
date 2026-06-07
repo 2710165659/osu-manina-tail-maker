@@ -6,7 +6,7 @@ import type { Preset } from '../../types/config'
 
 const emit = defineEmits<{ close: [] }>()
 
-const { presets, loadPreset, savePreset, deletePreset } = useConfig()
+const { presets, loadPreset, savePreset, deletePreset, currentPreset } = useConfig()
 
 // 缩略图缓存: preset name → cropped base64 data URL
 const thumbnails = ref<Map<string, string>>(new Map())
@@ -118,7 +118,7 @@ onMounted(() => {
         <div
           v-for="preset in presets"
           :key="preset.name"
-          class="preset-card"
+          :class="['preset-card', { active: currentPreset?.name === preset.name }]"
           @click="handleLoad(preset)"
         >
           <div class="preset-thumb">
@@ -265,6 +265,11 @@ onMounted(() => {
   background: var(--bg-surface);
   border-color: var(--accent-purple);
   box-shadow: 0 0 16px rgba(183, 108, 241, 0.1);
+}
+.preset-card.active {
+  border-color: var(--accent-purple);
+  background: var(--accent-purple-bg);
+  box-shadow: 0 0 12px rgba(183, 108, 241, 0.2);
 }
 
 .preset-thumb {

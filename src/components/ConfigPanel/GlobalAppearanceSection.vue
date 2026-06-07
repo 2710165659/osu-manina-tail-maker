@@ -1,53 +1,76 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { isFieldDefault, rgbaToHex, hexToRgba } from '../../types/config'
+import { rgbaToHex, hexToRgba } from '../../types/config'
 import RevertButton from './RevertButton.vue'
 
-const { config, resetField, setBodyProp, resetBodyField } = useConfig()
+const { config, resetField, setBodyProp, resetBodyField, isFieldDefault } = useConfig()
 
 const marginMax = computed(() => Math.floor((config.image.width - 1) / 2))
 const contentWidth = computed(() => config.image.width - config.margin * 2)
-const marginModel = computed({
-  get: () => config.margin,
-  set: (v: number) => (config.margin = Math.max(0, Math.min(marginMax.value, v))),
-})
+const marginStr = ref(String(config.margin))
+watch(() => config.margin, (v) => { marginStr.value = String(v) })
+function applyMargin() {
+  const v = parseInt(marginStr.value)
+  if (!isNaN(v)) config.margin = Math.max(0, Math.min(marginMax.value, v))
+  else marginStr.value = String(config.margin)
+}
 
 const throwMax = computed(() => Math.max(0, config.image.height - 1))
-const throwModel = computed({
-  get: () => config.throwLength,
-  set: (v: number) => (config.throwLength = Math.max(0, Math.min(throwMax.value, v))),
-})
+const throwStr = ref(String(config.throwLength))
+watch(() => config.throwLength, (v) => { throwStr.value = String(v) })
+function applyThrow() {
+  const v = parseInt(throwStr.value)
+  if (!isNaN(v)) config.throwLength = Math.max(0, Math.min(throwMax.value, v))
+  else throwStr.value = String(config.throwLength)
+}
 
 const colorHex = ref(rgbaToHex(config.globalColor))
 watch(() => config.globalColor, (c) => { colorHex.value = rgbaToHex(c) })
 function applyHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.globalColor = hexToRgba('#' + clean)
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.globalColor = hexToRgba('#' + clean)
+    colorHex.value = '#' + clean
+  }
 }
 
-const opacityModel = computed({
-  get: () => config.globalOpacity,
-  set: (v: number) => (config.globalOpacity = Math.max(0, Math.min(255, v))),
-})
-const opacityPct = computed(() => Math.round((config.globalOpacity / 255) * 100))
+const opacityVal = ref(config.globalOpacity)
+watch(() => config.globalOpacity, (v) => { opacityVal.value = v })
+function applyOpacity() { config.globalOpacity = Math.max(0, Math.min(255, opacityVal.value)) }
+const opacityPct = computed(() => Math.round((opacityVal.value / 255) * 100))
 
 // 边框
 const bHex = ref(rgbaToHex(config.body.borderColor))
 watch(() => config.body.borderColor, (c) => { bHex.value = rgbaToHex(c) })
 function applyBorderHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.body.borderColor = hexToRgba('#' + clean, config.body.borderColor.a)
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.body.borderColor = hexToRgba('#' + clean, config.body.borderColor.a)
+    bHex.value = '#' + clean
+  }
 }
-const borderOpacityModel = computed({
-  get: () => config.body.borderOpacity,
-  set: (v: number) => setBodyProp('borderOpacity', Math.max(0, Math.min(255, v))),
-})
-const borderOpacityPct = computed(() => Math.round((config.body.borderOpacity / 255) * 100))
-const borderWidthModel = computed({
-  get: () => config.body.borderWidth,
-  set: (v: number) => setBodyProp('borderWidth', Math.max(1, v)),
-})
+const borderOpacityVal = ref(config.body.borderOpacity)
+watch(() => config.body.borderOpacity, (v) => { borderOpacityVal.value = v })
+function applyBorderOpacity() { setBodyProp('borderOpacity', Math.max(0, Math.min(255, borderOpacityVal.value))) }
+const borderOpacityPct = computed(() => Math.round((borderOpacityVal.value / 255) * 100))
+const borderStr = ref(String(config.body.borderWidth))
+watch(() => config.body.borderWidth, (v) => { borderStr.value = String(v) })
+function applyBorderWidth() {
+  const v = parseInt(borderStr.value)
+  if (!isNaN(v)) setBodyProp('borderWidth', Math.max(1, v))
+  else borderStr.value = String(config.body.borderWidth)
+}
 </script>
 
 <template>
@@ -65,10 +88,10 @@ const borderWidthModel = computed({
     <div class="field">
       <div class="label-row">
         <label class="field-label">留白 <span class="unit">px</span> <span class="field-hint">（左右对称）</span></label>
-        <RevertButton :visible="!isFieldDefault(config, 'margin')" @revert="resetField('margin')" />
+        <RevertButton :visible="!isFieldDefault( 'margin')" @revert="resetField('margin')" />
       </div>
       <div class="input-wrap">
-        <input v-model.number="marginModel" type="number" :min="0" :max="marginMax" class="num-input" />
+        <input v-model="marginStr" type="text" inputmode="numeric" class="num-input" @blur="applyMargin" @keyup.enter="applyMargin" />
       </div>
       <div class="field-info">内容区宽度: <strong>{{ contentWidth }}px</strong></div>
     </div>
@@ -76,31 +99,31 @@ const borderWidthModel = computed({
     <div class="field">
       <div class="label-row">
         <label class="field-label">投的长度 <span class="unit">px</span></label>
-        <RevertButton :visible="!isFieldDefault(config, 'throwLength')" @revert="resetField('throwLength')" />
+        <RevertButton :visible="!isFieldDefault( 'throwLength')" @revert="resetField('throwLength')" />
       </div>
       <div class="input-wrap">
-        <input v-model.number="throwModel" type="number" :min="0" :max="throwMax" class="num-input" />
+        <input v-model="throwStr" type="text" inputmode="numeric" class="num-input" @blur="applyThrow" @keyup.enter="applyThrow" />
       </div>
     </div>
 
     <div class="field">
       <div class="label-row">
         <label class="field-label">颜色</label>
-        <RevertButton :visible="!isFieldDefault(config, 'globalColor')" @revert="resetField('globalColor')" />
+        <RevertButton :visible="!isFieldDefault( 'globalColor')" @revert="resetField('globalColor')" />
       </div>
       <div class="color-row">
         <input type="color" :value="rgbaToHex(config.globalColor)" class="color-picker" @input="applyHex(($event.target as HTMLInputElement).value)" />
-        <input v-model="colorHex" class="hex-input" maxlength="7" @change="applyHex(colorHex)" @blur="applyHex(colorHex)" />
+        <input v-model="colorHex" class="hex-input" maxlength="7" @blur="applyHex(colorHex)" @keyup.enter="applyHex(colorHex)" />
       </div>
     </div>
 
     <div class="field">
       <div class="label-row">
         <label class="field-label">透明度</label>
-        <RevertButton :visible="!isFieldDefault(config, 'globalOpacity')" @revert="resetField('globalOpacity')" />
+        <RevertButton :visible="!isFieldDefault( 'globalOpacity')" @revert="resetField('globalOpacity')" />
       </div>
       <div class="slider-row">
-        <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
+        <input v-model.number="opacityVal" type="range" min="0" max="255" class="slider" @change="applyOpacity" />
         <span class="slider-val">{{ opacityPct }}%</span>
       </div>
     </div>
@@ -124,8 +147,8 @@ const borderWidthModel = computed({
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.body.borderColor)" class="color-picker"
             @input="applyBorderHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="bHex" class="hex-input" maxlength="7" @change="applyBorderHex(bHex)"
-            @blur="applyBorderHex(bHex)" />
+          <input v-model="bHex" class="hex-input" maxlength="7" @blur="applyBorderHex(bHex)"
+            @keyup.enter="applyBorderHex(bHex)" />
         </div>
 
         <div class="opacity-label-row">
@@ -134,14 +157,14 @@ const borderWidthModel = computed({
         <div class="slider-row">
           <button :class="['opacity-independent-btn', { on: config.body.borderOpacityIndependent }]"
             @click="setBodyProp('borderOpacityIndependent', !config.body.borderOpacityIndependent)">独立</button>
-          <input v-model.number="borderOpacityModel" type="range" min="0" max="255" class="slider"
-            :disabled="!config.body.borderOpacityIndependent" />
+          <input v-model.number="borderOpacityVal" type="range" min="0" max="255" class="slider"
+            :disabled="!config.body.borderOpacityIndependent" @change="applyBorderOpacity" />
           <span class="slider-val">{{ borderOpacityPct }}%</span>
         </div>
 
         <div class="other-label">粗细 <span class="unit">px</span></div>
         <div class="input-wrap">
-          <input v-model.number="borderWidthModel" type="number" min="1" class="num-input narrow" />
+          <input v-model="borderStr" type="text" inputmode="numeric" class="num-input narrow" @blur="applyBorderWidth" @keyup.enter="applyBorderWidth" />
         </div>
       </div>
     </div>

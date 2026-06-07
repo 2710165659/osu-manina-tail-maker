@@ -21,11 +21,11 @@ pub fn builtin_presets() -> Vec<Preset> {
         Preset {
             name: "球皮-标准".to_string(), builtin: true,
             config: TailConfig {
-                image: ImageConfig { width: 40, height: 32800, filename: "mania-noteL".to_string() },
-                margin: 0, throw_length: 100, global_color: RgbaColor::WHITE,
-                cap: CapConfig { shape: CapShape::Ball, scale: 100, independent_settings: false, color: RgbaColor::WHITE, opacity: 255 },
-                body: BodyConfig { independent_settings: true, color: RgbaColor::WHITE, opacity: 200, border_enabled: true, border_color: RgbaColor::WHITE, border_opacity: 180, border_opacity_independent: false, border_match_body: false, border_width: 1 },
-                effect: effect_with_echo_color(RgbaColor::WHITE),
+                image: ImageConfig { width: 100, height: 32800, filename: "mania-noteL".to_string() },
+                margin: 8, throw_length: 100, global_color: RgbaColor::GREY,
+                cap: CapConfig { shape: CapShape::Ball, scale: 100, independent_settings: false, color: RgbaColor::GREY, opacity: 255 },
+                body: BodyConfig { independent_settings: false, color: RgbaColor::GREY, opacity: 255, border_enabled: false, border_color: RgbaColor::WHITE, border_opacity: 255, border_opacity_independent: false, border_match_body: false, border_width: 1 },
+                effect: effect_with_echo_color(RgbaColor::GREY),
                 global_opacity: 255,
             },
         },

@@ -8,15 +8,22 @@ const { config, setBodyProp } = useConfig()
 const bodyHex = ref(rgbaToHex(config.body.color))
 watch(() => config.body.color, (c) => { bodyHex.value = rgbaToHex(c) })
 function applyBodyHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.body.color = hexToRgba('#' + clean, config.body.color.a)
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.body.color = hexToRgba('#' + clean, config.body.color.a)
+    bodyHex.value = '#' + clean
+  }
 }
 
-const opacityModel = computed({
-  get: () => config.body.opacity,
-  set: (v: number) => setBodyProp('opacity', Math.max(0, Math.min(255, v))),
-})
-const opacityPct = computed(() => Math.round((config.body.opacity / 255) * 100))
+const opacityVal = ref(config.body.opacity)
+watch(() => config.body.opacity, (v) => { opacityVal.value = v })
+function applyBodyOpacity() { setBodyProp('opacity', Math.max(0, Math.min(255, opacityVal.value))) }
+const opacityPct = computed(() => Math.round((opacityVal.value / 255) * 100))
 
 function toggleIndependent() {
   const next = !config.body.independentSettings
@@ -52,14 +59,14 @@ function toggleIndependent() {
         </div>
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.body.color)" class="color-picker" @input="applyBodyHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="bodyHex" class="hex-input" maxlength="7" @change="applyBodyHex(bodyHex)" @blur="applyBodyHex(bodyHex)" />
+          <input v-model="bodyHex" class="hex-input" maxlength="7" @blur="applyBodyHex(bodyHex)" @keyup.enter="applyBodyHex(bodyHex)" />
         </div>
 
         <div class="opacity-label-row">
           <span class="sub-label">透明度</span>
         </div>
         <div class="slider-row">
-          <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
+          <input v-model.number="opacityVal" type="range" min="0" max="255" class="slider" @change="applyBodyOpacity" />
           <span class="slider-val">{{ opacityPct }}%</span>
         </div>
       </div>

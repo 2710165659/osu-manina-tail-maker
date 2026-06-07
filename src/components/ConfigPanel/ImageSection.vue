@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { isImageFieldDefault } from '../../types/config'
 import RevertButton from './RevertButton.vue'
 
-const { config, setImageProp, resetImageField } = useConfig()
+const { config, setImageProp, resetImageField, isImageFieldDefault } = useConfig()
 const widthWarn = ref('')
 
 const widthModel = computed({
@@ -55,7 +54,7 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
               </span>
             </label>
-            <RevertButton :visible="!isImageFieldDefault(config, 'width')" @revert="resetImageField('width')" />
+            <RevertButton :visible="!isImageFieldDefault('width')" @revert="resetImageField('width')" />
           </div>
           <div v-if="tipKey === 'width'" class="help-tip-banner">{{ tipText }}</div>
         </div>
@@ -79,7 +78,7 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
               </span>
             </label>
-            <RevertButton :visible="!isImageFieldDefault(config, 'height')" @revert="resetImageField('height')" />
+            <RevertButton :visible="!isImageFieldDefault('height')" @revert="resetImageField('height')" />
           </div>
           <div v-if="tipKey === 'height'" class="help-tip-banner">{{ tipText }}</div>
         </div>
@@ -103,7 +102,7 @@ function hideTip() { tipKey.value = ''; tipText.value = '' }
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1"/><path d="M5.4 5.4a.6.6 0 0 1 1.2 0c0 .66-.6.9-.6 1.5v.3h.6v-.3c0-.66.6-.9.6-1.5a1.2 1.2 0 1 0-2.4 0h.6ZM5.4 9h1.2v-1.2h-1.2z" fill="currentColor"/></svg>
             </span>
           </label>
-          <RevertButton :visible="!isImageFieldDefault(config, 'filename')" @revert="resetImageField('filename')" />
+          <RevertButton :visible="!isImageFieldDefault('filename')" @revert="resetImageField('filename')" />
         </div>
         <div v-if="tipKey === 'filename'" class="help-tip-banner">{{ tipText }}</div>
       </div>

@@ -5,7 +5,7 @@ import ExportBar from './ExportBar.vue'
 import PresetPanel from './PresetPanel.vue'
 import ImportPanel from './ImportPanel.vue'
 
-const { config, previewBase64, previewLoading, resetConfig } = useConfig()
+const { config, previewBase64, previewLoading, resetConfig, currentPreset } = useConfig()
 
 const container = ref<HTMLDivElement>()
 const mainCanvas = ref<HTMLCanvasElement>()
@@ -277,7 +277,7 @@ watch([s, cw, ch], paint, { flush: 'post' })
             <path d="M11.5 1.5v3h-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M2.5 12.5v-3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          {{ resetConfirming ? '确认重置？' : '重置' }}
+          {{ resetConfirming ? '确认重置？' : (currentPreset ? `重置到"${currentPreset.name}"` : '重置') }}
         </button>
       </div>
       <span class="st"><span :class="['dot', previewLoading ? 'ld' : 'ok']"></span>{{ previewLoading ? '渲染中' : '预览' }}</span>

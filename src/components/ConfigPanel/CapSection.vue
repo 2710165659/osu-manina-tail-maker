@@ -1,32 +1,39 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
-import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, isCapFieldDefault, type CapShape } from '../../types/config'
+import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, type CapShape } from '../../types/config'
 import RevertButton from './RevertButton.vue'
 
-const { config, setCapProp, resetCapField, setEffectProp, resetEffectField } = useConfig()
+const { config, setCapProp, resetCapField, setEffectProp, resetEffectField, isCapFieldDefault } = useConfig()
 const shapes = CAP_SHAPE_ORDER
 
 const capScaleModel = ref(config.cap.scale)
 const capScaleFree = ref(false)
 watch(() => config.cap.scale, (v) => { if (!capScaleFree.value) capScaleModel.value = v })
-function applyScale(v: number) {
-  capScaleFree.value = v > 500
-  setCapProp('scale', Math.max(1, v))
+function applyScale() {
+  capScaleFree.value = capScaleModel.value > 500
+  setCapProp('scale', Math.max(1, capScaleModel.value))
 }
 
 const capHex = ref(rgbaToHex(config.cap.color))
 watch(() => config.cap.color, (c) => { capHex.value = rgbaToHex(c) })
 function applyCapHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.cap.color = hexToRgba('#' + clean, config.cap.color.a)
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.cap.color = hexToRgba('#' + clean, config.cap.color.a)
+    capHex.value = '#' + clean
+  }
 }
 
-const opacityModel = computed({
-  get: () => config.cap.opacity,
-  set: (v: number) => setCapProp('opacity', Math.max(0, Math.min(255, v))),
-})
-const opacityPct = computed(() => Math.round((config.cap.opacity / 255) * 100))
+const opacityVal = ref(config.cap.opacity)
+watch(() => config.cap.opacity, (v) => { opacityVal.value = v })
+function applyCapOpacity() { setCapProp('opacity', Math.max(0, Math.min(255, opacityVal.value))) }
+const opacityPct = computed(() => Math.round((opacityVal.value / 255) * 100))
 
 function selectShape(s: CapShape) {
   setCapProp('shape', s)
@@ -59,7 +66,7 @@ function toggleIndependent() {
     <div class="field">
       <div class="label-row">
         <label class="field-label">顶端形状</label>
-        <RevertButton :visible="!isCapFieldDefault(config, 'shape')" @revert="resetCapField('shape')" />
+        <RevertButton :visible="!isCapFieldDefault( 'shape')" @revert="resetCapField('shape')" />
       </div>
       <div class="shape-selector">
         <button v-for="s in shapes" :key="s" :class="['shape-btn', { active: config.cap.shape === s }]" @click="selectShape(s)">
@@ -86,11 +93,11 @@ function toggleIndependent() {
     <div class="field">
       <div class="label-row">
         <label class="field-label">顶端缩放</label>
-        <RevertButton :visible="!isCapFieldDefault(config, 'scale')" @revert="resetCapField('scale')" />
+        <RevertButton :visible="!isCapFieldDefault( 'scale')" @revert="resetCapField('scale')" />
       </div>
       <div class="scale-row">
-        <input v-model.number="capScaleModel" type="range" min="1" max="500" class="slider" @input="applyScale(capScaleModel)" />
-        <input v-model.number="capScaleModel" type="number" :min="1" class="num-input scale-num" @change="applyScale(capScaleModel)" />
+        <input v-model.number="capScaleModel" type="range" min="1" max="500" class="slider" @change="applyScale" />
+        <input v-model.number="capScaleModel" type="number" :min="1" class="num-input scale-num" @change="applyScale" />
       </div>
     </div>
 
@@ -111,14 +118,14 @@ function toggleIndependent() {
         </div>
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.cap.color)" class="color-picker" @input="applyCapHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="capHex" class="hex-input" maxlength="7" @change="applyCapHex(capHex)" @blur="applyCapHex(capHex)" />
+          <input v-model="capHex" class="hex-input" maxlength="7" @blur="applyCapHex(capHex)" @keyup.enter="applyCapHex(capHex)" />
         </div>
 
         <div class="opacity-label-row">
           <span class="sub-label">透明度</span>
         </div>
         <div class="slider-row">
-          <input v-model.number="opacityModel" type="range" min="0" max="255" class="slider" />
+          <input v-model.number="opacityVal" type="range" min="0" max="255" class="slider" @change="applyCapOpacity" />
           <span class="slider-val">{{ opacityPct }}%</span>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { ref, reactive, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import type { TailConfig, Preset, CapConfig, BodyConfig, ImageConfig, EffectConfig } from '../types/config'
-import { createDefaultConfig, hexToRgba, rgbaToHex, getDefaultField } from '../types/config'
+import { createDefaultConfig, hexToRgba, rgbaToHex } from '../types/config'
 
 // 全局单例状态
 const config = reactive<TailConfig>(createDefaultConfig())
@@ -10,6 +10,7 @@ const previewBase64 = ref<string>('')
 const previewLoading = ref(false)
 const validationErrors = ref<string[]>([])
 const dirty = ref(false)
+const currentPreset = ref<Preset | null>(null)
 
 // 防抖预览定时器
 let previewTimer: ReturnType<typeof setTimeout> | null = null
@@ -22,8 +23,15 @@ export function useConfig() {
         invoke<TailConfig>('get_default_config'),
         invoke<Preset[]>('get_presets'),
       ])
-      Object.assign(config, defaultCfg)
       presets.value = presetList
+      // 默认加载第一个内置预设
+      const firstBuiltin = presetList.find(p => p.builtin)
+      if (firstBuiltin) {
+        currentPreset.value = JSON.parse(JSON.stringify(firstBuiltin))
+        Object.assign(config, JSON.parse(JSON.stringify(firstBuiltin.config)))
+      } else {
+        Object.assign(config, defaultCfg)
+      }
       await updatePreview()
     } catch (e) {
       console.error('初始化失败:', e)
@@ -68,6 +76,7 @@ export function useConfig() {
 
   // --- 预设 ---
   async function loadPreset(preset: Preset) {
+    currentPreset.value = JSON.parse(JSON.stringify(preset))
     Object.assign(config, JSON.parse(JSON.stringify(preset.config)))
     await updatePreview()
   }
@@ -79,6 +88,10 @@ export function useConfig() {
     if (idx >= 0) {
       // 覆盖已有预设（UI 层已做二次确认）
       presets.value[idx].config = newConfig
+      // 更新当前预设引用
+      if (currentPreset.value?.name === name) {
+        currentPreset.value = JSON.parse(JSON.stringify(presets.value[idx]))
+      }
     } else {
       // 新增预设
       const newPreset: Preset = {
@@ -98,10 +111,27 @@ export function useConfig() {
       throw new Error(`不能删除内置预设 "${name}"`)
     }
     presets.value.splice(idx, 1)
+    // 如果删除的是当前预设，清除引用
+    if (currentPreset.value?.name === name) {
+      currentPreset.value = null
+    }
     await persistUserPresets()
   }
 
   function resetConfig() {
+    if (currentPreset.value) {
+      // 有当前预设时，重置到该预设的值
+      Object.assign(config, JSON.parse(JSON.stringify(currentPreset.value.config)))
+    } else {
+      // 没有当前预设时，重置到全局默认值
+      Object.assign(config, createDefaultConfig())
+    }
+    updatePreview()
+  }
+
+  /** 重置到全局默认值（忽略当前预设） */
+  function resetToGlobalDefault() {
+    currentPreset.value = null
     Object.assign(config, createDefaultConfig())
     updatePreview()
   }
@@ -144,34 +174,71 @@ export function useConfig() {
     config.body.borderColor = hexToRgba(hex, config.body.borderColor.a)
   }
 
-  /** 恢复顶层字段为默认值 */
+  /** 获取参考配置（当前预设或全局默认） */
+  function getRefConfig(): TailConfig {
+    return currentPreset.value
+      ? JSON.parse(JSON.stringify(currentPreset.value.config))
+      : createDefaultConfig()
+  }
+
+  /** 判断顶层字段是否与预设一致 */
+  function isFieldDefault<K extends keyof TailConfig>(field: K): boolean {
+    const ref = getRefConfig()
+    return JSON.stringify(config[field]) === JSON.stringify(ref[field])
+  }
+
+  /** 判断 cap 子字段是否与预设一致 */
+  function isCapFieldDefault<K extends keyof CapConfig>(field: K): boolean {
+    const ref = getRefConfig()
+    return JSON.stringify(config.cap[field]) === JSON.stringify(ref.cap[field])
+  }
+
+  /** 判断 body 子字段是否与预设一致 */
+  function isBodyFieldDefault<K extends keyof BodyConfig>(field: K): boolean {
+    const ref = getRefConfig()
+    return JSON.stringify(config.body[field]) === JSON.stringify(ref.body[field])
+  }
+
+  /** 判断 effect 子字段是否与预设一致 */
+  function isEffectFieldDefault<K extends keyof EffectConfig>(field: K): boolean {
+    const ref = getRefConfig()
+    return JSON.stringify(config.effect[field]) === JSON.stringify(ref.effect[field])
+  }
+
+  /** 判断 image 子字段是否与预设一致 */
+  function isImageFieldDefault<K extends keyof ImageConfig>(field: K): boolean {
+    const ref = getRefConfig()
+    return JSON.stringify(config.image[field]) === JSON.stringify(ref.image[field])
+  }
+
+  /** 恢复顶层字段为预设值 */
   function resetField<K extends keyof TailConfig>(field: K) {
-    const def = getDefaultField(field) as TailConfig[K]
-    ;(config as any)[field] = def
+    const ref = getRefConfig()
+    ;(config as any)[field] = JSON.parse(JSON.stringify(ref[field]))
   }
 
-  /** 恢复 cap 子字段为默认值 */
+  /** 恢复 cap 子字段为预设值 */
   function resetCapField<K extends keyof CapConfig>(field: K) {
-    const def = getDefaultField('cap') as CapConfig
-    ;(config.cap as any)[field] = def[field]
+    const ref = getRefConfig()
+    ;(config.cap as any)[field] = JSON.parse(JSON.stringify(ref.cap[field]))
   }
 
-  /** 恢复 body 子字段为默认值 */
+  /** 恢复 body 子字段为预设值 */
   function resetBodyField<K extends keyof BodyConfig>(field: K) {
-    const def = getDefaultField('body') as BodyConfig
-    ;(config.body as any)[field] = def[field]
+    const ref = getRefConfig()
+    ;(config.body as any)[field] = JSON.parse(JSON.stringify(ref.body[field]))
   }
 
-  /** 恢复 effect 子字段为默认值 */
+  /** 恢复 effect 子字段为预设值 */
   function resetEffectField<K extends keyof EffectConfig>(field: K) {
-    const def = getDefaultField('effect') as EffectConfig
-    ;(config.effect as any)[field] = def[field]
+    const ref = getRefConfig()
+    ;(config.effect as any)[field] = JSON.parse(JSON.stringify(ref.effect[field]))
   }
 
-  /** 恢复 image 子字段为默认值 */
+  /** 恢复 image 子字段为预设值 */
   function resetImageField<K extends keyof ImageConfig>(field: K) {
-    const def = getDefaultField('image') as ImageConfig
-    ;(config.image as any)[field] = def[field]
+    const ref = getRefConfig()
+    ;(config.image as any)[field] = JSON.parse(JSON.stringify(ref.image[field]))
   }
 
   return {
@@ -181,6 +248,7 @@ export function useConfig() {
     previewLoading,
     validationErrors,
     dirty,
+    currentPreset,
     // methods
     init,
     updatePreview,
@@ -189,6 +257,7 @@ export function useConfig() {
     savePreset,
     deletePreset,
     resetConfig,
+    resetToGlobalDefault,
     loadUserPresets,
     setImageProp,
     setCapProp,
@@ -202,6 +271,12 @@ export function useConfig() {
     resetBodyField,
     resetImageField,
     resetEffectField,
+    // field default checks
+    isFieldDefault,
+    isCapFieldDefault,
+    isBodyFieldDefault,
+    isEffectFieldDefault,
+    isImageFieldDefault,
     // helpers
     rgbaToHex,
     hexToRgba,

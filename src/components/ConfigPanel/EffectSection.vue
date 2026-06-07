@@ -9,40 +9,51 @@ const { config, setEffectProp, resetEffectField } = useConfig()
 const glowHex = ref(rgbaToHex(config.effect.glowColor))
 watch(() => config.effect.glowColor, (c) => { glowHex.value = rgbaToHex(c) })
 function applyGlowHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.effect.glowColor = hexToRgba('#' + clean, config.effect.glowColor.a)
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.effect.glowColor = hexToRgba('#' + clean, config.effect.glowColor.a)
+    glowHex.value = '#' + clean
+  }
 }
-const glowOpacityModel = computed({
-  get: () => config.effect.glowOpacity,
-  set: (v: number) => setEffectProp('glowOpacity', Math.max(0, Math.min(255, v))),
-})
-const glowOpacityPct = computed(() => Math.round((config.effect.glowOpacity / 255) * 100))
-const glowSizeModel = computed({
-  get: () => config.effect.glowSize,
-  set: (v: number) => setEffectProp('glowSize', Math.max(0, Math.min(100, v))),
-})
-const glowSpreadModel = computed({
-  get: () => config.effect.glowSpread,
-  set: (v: number) => setEffectProp('glowSpread', Math.max(0, Math.min(100, v))),
-})
+const glowOpacityVal = ref(config.effect.glowOpacity)
+watch(() => config.effect.glowOpacity, (v) => { glowOpacityVal.value = v })
+function applyGlowOpacity() { setEffectProp('glowOpacity', Math.max(0, Math.min(255, glowOpacityVal.value))) }
+const glowOpacityPct = computed(() => Math.round((glowOpacityVal.value / 255) * 100))
+const glowSizeVal = ref(config.effect.glowSize)
+watch(() => config.effect.glowSize, (v) => { glowSizeVal.value = v })
+function applyGlowSize() { setEffectProp('glowSize', Math.max(0, Math.min(100, glowSizeVal.value))) }
+const glowSpreadVal = ref(config.effect.glowSpread)
+watch(() => config.effect.glowSpread, (v) => { glowSpreadVal.value = v })
+function applyGlowSpread() { setEffectProp('glowSpread', Math.max(0, Math.min(100, glowSpreadVal.value))) }
 
 // 暗化重复
 const echoHex = ref(rgbaToHex(config.effect.echoColor))
 watch(() => config.effect.echoColor, (c) => { echoHex.value = rgbaToHex(c) })
 function applyEchoHex(v: string) {
-  const clean = v.replace('#', '').trim()
-  if (/^[0-9a-fA-F]{6}$/.test(clean)) config.effect.echoColor = hexToRgba('#' + clean, config.effect.echoColor.a)
+  let clean = v.replace('#', '').replace(/[^0-9a-fA-F]/g, '')
+  if (clean.length > 6) clean = clean.slice(0, 6)
+  if (clean.length === 1) clean = clean.repeat(6)
+  else if (clean.length === 2) clean = clean.repeat(3)
+  else if (clean.length === 3) clean = clean[0]+clean[0]+clean[1]+clean[1]+clean[2]+clean[2]
+  else if (clean.length >= 4 && clean.length < 6) clean = clean.padEnd(6, '0')
+  if (clean.length === 6) {
+    config.effect.echoColor = hexToRgba('#' + clean, config.effect.echoColor.a)
+    echoHex.value = '#' + clean
+  }
 }
-const echoOpacityModel = computed({
-  get: () => config.effect.echoOpacity,
-  set: (v: number) => setEffectProp('echoOpacity', Math.max(0, Math.min(255, v))),
-})
-const echoOpacityPct = computed(() => Math.round((config.effect.echoOpacity / 255) * 100))
+const echoOpacityVal = ref(config.effect.echoOpacity)
+watch(() => config.effect.echoOpacity, (v) => { echoOpacityVal.value = v })
+function applyEchoOpacity() { setEffectProp('echoOpacity', Math.max(0, Math.min(255, echoOpacityVal.value))) }
+const echoOpacityPct = computed(() => Math.round((echoOpacityVal.value / 255) * 100))
 const throwMax = computed(() => Math.max(0, config.image.height - 1))
-const echoLengthModel = computed({
-  get: () => config.effect.echoLength,
-  set: (v: number) => setEffectProp('echoLength', Math.max(0, v)),
-})
+const echoLengthVal = ref(config.effect.echoLength)
+watch(() => config.effect.echoLength, (v) => { echoLengthVal.value = v })
+function applyEchoLength() { setEffectProp('echoLength', Math.max(0, echoLengthVal.value)) }
 
 const isGradient = computed(() => config.cap.shape === 'gradient')
 
@@ -91,21 +102,21 @@ function toggleEcho() {
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.effect.echoColor)" class="color-picker"
             @input="applyEchoHex(($event.target as HTMLInputElement).value)" />
-          <input v-model="echoHex" class="hex-input" maxlength="7" @change="applyEchoHex(echoHex)"
-            @blur="applyEchoHex(echoHex)" />
+          <input v-model="echoHex" class="hex-input" maxlength="7" @blur="applyEchoHex(echoHex)"
+            @keyup.enter="applyEchoHex(echoHex)" />
         </div>
 
         <div class="opacity-label-row">
           <span class="sub-label">透明度</span>
         </div>
         <div class="slider-row">
-          <input v-model.number="echoOpacityModel" type="range" min="0" max="255" class="slider" />
+          <input v-model.number="echoOpacityVal" type="range" min="0" max="255" class="slider" @change="applyEchoOpacity" />
           <span class="slider-val">{{ echoOpacityPct }}%</span>
         </div>
 
         <div class="other-label">长度 <span class="unit">px</span></div>
         <div class="input-wrap" style="margin-top:4px">
-          <input v-model.number="echoLengthModel" type="number" :min="0" :max="throwMax" class="num-input" />
+          <input v-model.number="echoLengthVal" type="number" :min="0" :max="throwMax" class="num-input" @change="applyEchoLength" />
         </div>
       </div>
     </div>
@@ -130,8 +141,8 @@ function toggleEcho() {
         <div class="color-row">
           <input type="color" :value="rgbaToHex(config.effect.glowColor)" class="color-picker"
             @input="applyGlowHex(($event.target as HTMLInputElement).value)" :disabled="config.effect.glowMatchBody" />
-          <input v-model="glowHex" class="hex-input" maxlength="7" @change="applyGlowHex(glowHex)"
-            @blur="applyGlowHex(glowHex)" :disabled="config.effect.glowMatchBody" />
+          <input v-model="glowHex" class="hex-input" maxlength="7" @blur="applyGlowHex(glowHex)"
+            @keyup.enter="applyGlowHex(glowHex)" :disabled="config.effect.glowMatchBody" />
         </div>
 
         <div class="opacity-label-row">
@@ -140,19 +151,19 @@ function toggleEcho() {
         <div class="slider-row">
           <button :class="['opacity-independent-btn', { on: config.effect.glowOpacityIndependent }]"
             @click="setEffectProp('glowOpacityIndependent', !config.effect.glowOpacityIndependent)">独立</button>
-          <input v-model.number="glowOpacityModel" type="range" min="0" max="255" class="slider"
-            :disabled="!config.effect.glowOpacityIndependent" />
+          <input v-model.number="glowOpacityVal" type="range" min="0" max="255" class="slider"
+            :disabled="!config.effect.glowOpacityIndependent" @change="applyGlowOpacity" />
           <span class="slider-val">{{ glowOpacityPct }}%</span>
         </div>
 
         <div class="other-label">大小 <span class="unit">px</span></div>
         <div class="input-wrap">
-          <input v-model.number="glowSizeModel" type="number" min="0" max="100" class="num-input narrow" />
+          <input v-model.number="glowSizeVal" type="number" min="0" max="100" class="num-input narrow" @change="applyGlowSize" />
         </div>
 
         <div class="other-label">扩展 <span class="unit">px</span></div>
         <div class="input-wrap">
-          <input v-model.number="glowSpreadModel" type="number" min="0" max="100" class="num-input narrow" />
+          <input v-model.number="glowSpreadVal" type="number" min="0" max="100" class="num-input narrow" @change="applyGlowSpread" />
         </div>
       </div>
     </div>
