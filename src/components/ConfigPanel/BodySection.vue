@@ -23,8 +23,7 @@
           <span class="sub-label">颜色</span>
         </div>
         <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.body.color)" class="color-picker"
-            @input="applyBodyHex(($event.target as HTMLInputElement).value)" />
+          <ColorPicker v-model:pureColor="bodyHex" format="hex" @pureColorChange="debounceApplyBodyHex" :disableAlpha="true" />
           <input v-model="bodyHex" class="hex-input" maxlength="7" @blur="applyBodyHex(bodyHex)"
             @keyup.enter="applyBodyHex(bodyHex)" />
         </div>
@@ -45,6 +44,7 @@
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 import { rgbaToHex, hexToRgba } from '../../types/config'
+import { debounce } from '../../utils/debounce'
 
 const { config, setBodyProp } = useConfig()
 
@@ -62,6 +62,7 @@ function applyBodyHex(v: string) {
     bodyHex.value = '#' + clean
   }
 }
+const debounceApplyBodyHex = debounce(applyBodyHex, 500)
 
 const opacityVal = ref(config.body.opacity)
 watch(() => config.body.opacity, (v) => { opacityVal.value = v })
@@ -131,23 +132,12 @@ function toggleIndependent() {
   gap: 6px;
 }
 
-.color-picker {
+.color-row :deep(.vc-color-wrap) {
   width: 30px;
   height: 30px;
-  border: 2px solid var(--border-color);
+  min-width: 30px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  background: transparent;
-  padding: 2px;
-}
-
-.color-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-picker::-webkit-color-swatch {
-  border-radius: 2px;
-  border: none;
+  border: 2px solid var(--border-color);
 }
 
 .hex-input {

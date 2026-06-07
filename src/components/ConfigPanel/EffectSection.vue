@@ -26,8 +26,7 @@
           <span class="sub-label">颜色</span>
         </div>
         <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.effect.echoColor)" class="color-picker"
-            @input="applyEchoHex(($event.target as HTMLInputElement).value)" />
+          <ColorPicker v-model:pureColor="echoHex" format="hex" @pureColorChange="debounceApplyEchoHex" :disableAlpha="true" />
           <input v-model="echoHex" class="hex-input" maxlength="7" @blur="applyEchoHex(echoHex)"
             @keyup.enter="applyEchoHex(echoHex)" />
         </div>
@@ -67,8 +66,8 @@
             @click="setEffectProp('glowMatchBody', !config.effect.glowMatchBody)">跟随主体</button>
         </div>
         <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.effect.glowColor)" class="color-picker"
-            @input="applyGlowHex(($event.target as HTMLInputElement).value)" :disabled="config.effect.glowMatchBody" />
+          <ColorPicker v-model:pureColor="glowHex" format="hex" @pureColorChange="debounceApplyGlowHex"
+            :disableAlpha="true" :disabled="config.effect.glowMatchBody" />
           <input v-model="glowHex" class="hex-input" maxlength="7" @blur="applyGlowHex(glowHex)"
             @keyup.enter="applyGlowHex(glowHex)" :disabled="config.effect.glowMatchBody" />
         </div>
@@ -104,6 +103,7 @@
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 import { rgbaToHex, hexToRgba } from '../../types/config'
+import { debounce } from '../../utils/debounce'
 
 const { config, setEffectProp, resetEffectField } = useConfig()
 
@@ -122,6 +122,7 @@ function applyGlowHex(v: string) {
     glowHex.value = '#' + clean
   }
 }
+const debounceApplyGlowHex = debounce(applyGlowHex, 500)
 const glowOpacityVal = ref(config.effect.glowOpacity)
 watch(() => config.effect.glowOpacity, (v) => { glowOpacityVal.value = v })
 function applyGlowOpacity() { setEffectProp('glowOpacity', Math.max(0, Math.min(255, glowOpacityVal.value))) }
@@ -148,6 +149,7 @@ function applyEchoHex(v: string) {
     echoHex.value = '#' + clean
   }
 }
+const debounceApplyEchoHex = debounce(applyEchoHex, 500)
 const echoOpacityVal = ref(config.effect.echoOpacity)
 watch(() => config.effect.echoOpacity, (v) => { echoOpacityVal.value = v })
 function applyEchoOpacity() { setEffectProp('echoOpacity', Math.max(0, Math.min(255, echoOpacityVal.value))) }
@@ -250,23 +252,12 @@ function toggleEcho() {
   gap: 6px;
 }
 
-.color-picker {
+.color-row :deep(.vc-color-wrap) {
   width: 30px;
   height: 30px;
-  border: 2px solid var(--border-color);
+  min-width: 30px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  background: transparent;
-  padding: 2px;
-}
-
-.color-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-picker::-webkit-color-swatch {
-  border-radius: 2px;
-  border: none;
+  border: 2px solid var(--border-color);
 }
 
 .hex-input {

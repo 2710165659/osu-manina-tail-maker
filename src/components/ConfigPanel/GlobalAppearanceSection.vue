@@ -39,8 +39,7 @@
         <RevertButton :visible="!isFieldDefault('globalColor')" @revert="resetField('globalColor')" />
       </div>
       <div class="color-row">
-        <input type="color" :value="rgbaToHex(config.globalColor)" class="color-picker"
-          @input="applyHex(($event.target as HTMLInputElement).value)" />
+        <ColorPicker v-model:pureColor="colorHex" format="hex" @pureColorChange="debounceApplyHex" :disableAlpha="true" />
         <input v-model="colorHex" class="hex-input" maxlength="7" @blur="applyHex(colorHex)"
           @keyup.enter="applyHex(colorHex)" />
       </div>
@@ -74,8 +73,7 @@
           <span class="sub-label">颜色</span>
         </div>
         <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.body.borderColor)" class="color-picker"
-            @input="applyBorderHex(($event.target as HTMLInputElement).value)" />
+          <ColorPicker v-model:pureColor="bHex" format="hex" @pureColorChange="debounceApplyBorderHex" :disableAlpha="true" />
           <input v-model="bHex" class="hex-input" maxlength="7" @blur="applyBorderHex(bHex)"
             @keyup.enter="applyBorderHex(bHex)" />
         </div>
@@ -105,6 +103,7 @@
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 import { rgbaToHex, hexToRgba } from '../../types/config'
+import { debounce } from '../../utils/debounce'
 import RevertButton from './RevertButton.vue'
 
 const { config, resetField, setBodyProp, resetBodyField, isFieldDefault } = useConfig()
@@ -142,6 +141,7 @@ function applyHex(v: string) {
     colorHex.value = '#' + clean
   }
 }
+const debounceApplyHex = debounce(applyHex, 500)
 
 const opacityVal = ref(config.globalOpacity)
 watch(() => config.globalOpacity, (v) => { opacityVal.value = v })
@@ -163,6 +163,7 @@ function applyBorderHex(v: string) {
     bHex.value = '#' + clean
   }
 }
+const debounceApplyBorderHex = debounce(applyBorderHex, 500)
 const borderOpacityVal = ref(config.body.borderOpacity)
 watch(() => config.body.borderOpacity, (v) => { borderOpacityVal.value = v })
 function applyBorderOpacity() { setBodyProp('borderOpacity', Math.max(0, Math.min(255, borderOpacityVal.value))) }
@@ -210,23 +211,12 @@ function applyBorderWidth() {
   gap: 6px;
 }
 
-.color-picker {
+.color-row :deep(.vc-color-wrap) {
   width: 30px;
   height: 30px;
-  border: 2px solid var(--border-color);
+  min-width: 30px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  background: transparent;
-  padding: 2px;
-}
-
-.color-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-picker::-webkit-color-swatch {
-  border-radius: 2px;
-  border: none;
+  border: 2px solid var(--border-color);
 }
 
 .hex-input {

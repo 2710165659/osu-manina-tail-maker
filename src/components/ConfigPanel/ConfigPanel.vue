@@ -92,8 +92,6 @@ function openGitHub() {
   flex-direction: column;
   overflow: visible;
   position: relative;
-  z-index: 10001;
-  /* 高于 body::before 的 9999，确保 tooltip 不被遮挡 */
 }
 
 /* Subtle side glow on the panel edge */

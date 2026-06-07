@@ -70,8 +70,7 @@
           <span class="sub-label">颜色</span>
         </div>
         <div class="color-row">
-          <input type="color" :value="rgbaToHex(config.cap.color)" class="color-picker"
-            @input="applyCapHex(($event.target as HTMLInputElement).value)" />
+          <ColorPicker v-model:pureColor="capHex" format="hex" @pureColorChange="debounceApplyCapHex" :disableAlpha="true" />
           <input v-model="capHex" class="hex-input" maxlength="7" @blur="applyCapHex(capHex)"
             @keyup.enter="applyCapHex(capHex)" />
         </div>
@@ -92,6 +91,7 @@
 import { computed, ref, watch } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 import { CAP_SHAPE_LABELS, CAP_SHAPE_ORDER, rgbaToHex, hexToRgba, type CapShape } from '../../types/config'
+import { debounce } from '../../utils/debounce'
 import RevertButton from './RevertButton.vue'
 
 const { config, setCapProp, resetCapField, setEffectProp, resetEffectField, isCapFieldDefault } = useConfig()
@@ -119,6 +119,7 @@ function applyCapHex(v: string) {
     capHex.value = '#' + clean
   }
 }
+const debounceApplyCapHex = debounce(applyCapHex, 500)
 
 const opacityVal = ref(config.cap.opacity)
 watch(() => config.cap.opacity, (v) => { opacityVal.value = v })
@@ -256,23 +257,12 @@ function toggleIndependent() {
   gap: 6px;
 }
 
-.color-picker {
+.color-row :deep(.vc-color-wrap) {
   width: 30px;
   height: 30px;
-  border: 2px solid var(--border-color);
+  min-width: 30px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  background: transparent;
-  padding: 2px;
-}
-
-.color-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-picker::-webkit-color-swatch {
-  border-radius: 2px;
-  border: none;
+  border: 2px solid var(--border-color);
 }
 
 .hex-input {
