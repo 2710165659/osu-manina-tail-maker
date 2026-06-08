@@ -43,6 +43,7 @@
           <Transition name="tool-switch" mode="out-in">
             <TailRepair v-if="activeTab === 'tailRepair'" key="tailRepair" />
             <BatchGenerate v-else-if="activeTab === 'batchGenerate'" key="batchGenerate" />
+            <AddScript v-else-if="activeTab === 'addScript'" key="addScript" />
           </Transition>
         </main>
       </div>
@@ -54,6 +55,7 @@
 import { ref } from 'vue'
 import TailRepair from '../ToolPanel/TailRepair.vue'
 import BatchGenerate from '../ToolPanel/BatchGenerate.vue'
+import AddScript from '../ToolPanel/AddScript.vue'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -67,6 +69,10 @@ const tabs = [
   {
     id: 'batchGenerate',
     label: '批量生成图片',
+  },
+  {
+    id: 'addScript',
+    label: '添加脚本',
   }
 ]
 </script>
