@@ -98,10 +98,14 @@
           <button class="browse-btn" @click="handleBrowse">
             <span>浏览</span>
           </button>
-          <button class="btn btn-primary" @click="handleRepair" :disabled="!canRepair">
-            <span>开始修复</span>
-          </button>
         </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="field">
+        <button class="btn btn-primary btn-full" @click="handleRepair" :disabled="!canRepair">
+          <span>开始修复</span>
+        </button>
       </div>
     </div>
 
@@ -493,6 +497,10 @@ function handleRepair() {
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
+}
+
+.btn-full {
+  width: 100%;
 }
 
 .btn-primary {
