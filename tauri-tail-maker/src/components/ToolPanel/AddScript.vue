@@ -11,15 +11,6 @@
       <div class="field">
         <label class="field-label">目标范围</label>
         <div class="radio-cards">
-          <label :class="['radio-card', { active: targetMode === 'osk' }]" @click="targetMode = 'osk'">
-            <div class="radio-dot">
-              <div class="radio-dot-inner"></div>
-            </div>
-            <div class="radio-content">
-              <span class="radio-title">osk 文件</span>
-              <span class="radio-desc">选择单个 .osk 文件，解压后添加脚本并重新打包。</span>
-            </div>
-          </label>
           <label :class="['radio-card', { active: targetMode === 'folder' }]" @click="targetMode = 'folder'">
             <div class="radio-dot">
               <div class="radio-dot-inner"></div>
@@ -29,6 +20,15 @@
               <span class="radio-desc">选择已解压的皮肤文件夹，直接在其下创建脚本。</span>
             </div>
           </label>
+          <label :class="['radio-card', { active: targetMode === 'osk' }]" @click="targetMode = 'osk'">
+            <div class="radio-dot">
+              <div class="radio-dot-inner"></div>
+            </div>
+            <div class="radio-content">
+              <span class="radio-title">osk 文件</span>
+              <span class="radio-desc">选择单个 .osk 文件，解压后添加脚本并重新打包。</span>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -36,15 +36,13 @@
       <div class="field">
         <label class="field-label">预设选择</label>
         <div class="preset-grid">
-          <label
-            v-for="preset in presets"
-            :key="preset.name"
+          <label v-for="preset in presets" :key="preset.name"
             :class="['preset-card', { active: selectedPresetNames.has(preset.name) }]"
-            @click="togglePreset(preset.name)"
-          >
+            @click="togglePreset(preset.name)">
             <div class="checkbox-box">
               <svg v-if="selectedPresetNames.has(preset.name)" width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                  stroke-linejoin="round" />
               </svg>
             </div>
             <div class="preset-info">
@@ -62,9 +60,13 @@
         <div class="path-group">
           <div class="path-display">
             <svg class="path-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path v-if="targetMode === 'osk'" d="M1.5 7.5v3.5a1 1 0 001 1h9a1 1 0 001-1V7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
-              <path v-if="targetMode === 'osk'" d="M7 1.5v6M4.5 5L7 7.5 9.5 5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
-              <path v-if="targetMode === 'folder'" d="M1.5 3.5h4l1.5 2h5.5a1 1 0 011 1v5a1 1 0 01-1 1h-11a1 1 0 01-1-1v-7a1 1 0 011-1z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
+              <path v-if="targetMode === 'osk'" d="M1.5 7.5v3.5a1 1 0 001 1h9a1 1 0 001-1V7.5" stroke="currentColor"
+                stroke-width="1.1" stroke-linecap="round" />
+              <path v-if="targetMode === 'osk'" d="M7 1.5v6M4.5 5L7 7.5 9.5 5" stroke="currentColor" stroke-width="1.1"
+                stroke-linecap="round" stroke-linejoin="round" />
+              <path v-if="targetMode === 'folder'"
+                d="M1.5 3.5h4l1.5 2h5.5a1 1 0 011 1v5a1 1 0 01-1 1h-11a1 1 0 01-1-1v-7a1 1 0 011-1z"
+                stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <span class="path-text" :class="{ placeholder: !filePath }">
               {{ filePath || pathPlaceholder }}
@@ -80,7 +82,8 @@
       <div class="field">
         <button class="btn btn-primary btn-full" @click="handleAddScript" :disabled="!canExecute || executing">
           <svg v-if="!executing" width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M3.5 5L7 8.5l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M3.5 5L7 8.5l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" />
             <path d="M7 1.5v7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             <path d="M2 12.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
           </svg>
@@ -124,7 +127,7 @@ import { useConfig } from '../../composables/useConfig'
 
 const { presets } = useConfig()
 
-const targetMode = ref<'osk' | 'folder'>('osk')
+const targetMode = ref<'osk' | 'folder'>('folder')
 const filePath = ref('')
 const selectedPresetNames = ref(new Set<string>())
 const executing = ref(false)
