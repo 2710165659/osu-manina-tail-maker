@@ -53,7 +53,7 @@
             </div>
           </label>
         </div>
-        <span class="field-hint">选择要写入脚本的预设，脚本运行时可从这些预设中切换</span>
+        <span class="field-hint">可选，选择要写入脚本的预设，脚本运行时可从这些预设中切换</span>
       </div>
 
       <!-- 文件路径 -->
@@ -147,7 +147,7 @@ const pathPlaceholder = computed(() => {
 })
 
 const canExecute = computed(() => {
-  return filePath.value && selectedPresetNames.value.size > 0
+  return !!filePath.value
 })
 
 function togglePreset(name: string) {
@@ -209,10 +209,55 @@ async function handleAddScript() {
   addLog(`文件路径：${filePath.value}`, 'info')
   addLog(`选中预设：${selectedPresets.map(p => p.name).join('、')}`, 'info')
 
-  // TODO: 调用后端接口实现实际功能
-  addLog('⚠ 后端功能尚未实现', 'warning')
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
 
-  executing.value = false
+    // 导出预设图片（完整分辨率）
+    const presetImages: [string, number[]][] = []
+    if (selectedPresets.length > 0) {
+      addLog('正在导出预设图片...', 'info')
+      for (const preset of selectedPresets) {
+        try {
+          const base64 = await invoke<string>('export_image_bytes', { config: preset.config })
+          // 将 base64 转换为字节数组
+          const binaryStr = atob(base64)
+          const bytes = Array.from(binaryStr, c => c.charCodeAt(0))
+          presetImages.push([preset.name, bytes])
+          addLog(`  ✓ 导出预设：${preset.name}`, 'info')
+        } catch (e) {
+          addLog(`  ✗ 导出预设 ${preset.name} 失败：${e}`, 'warning')
+        }
+      }
+    }
+
+    if (targetMode.value === 'osk') {
+      // osk 文件：直接修改压缩包
+      addLog('正在将外部工具添加到 osk 文件...', 'info')
+      const result = await invoke('add_external_tool_to_osk_with_presets', {
+        oskPath: filePath.value,
+        presetImages: presetImages,
+      })
+      addLog(`✓ 外部工具已添加到：${result}`, 'success')
+    } else {
+      // 皮肤文件夹：复制文件
+      addLog('正在复制外部工具...', 'info')
+      const result = await invoke('copy_external_tool_with_presets', {
+        targetPath: filePath.value,
+        presetImages: presetImages,
+      })
+      addLog(`✓ 外部工具已复制到：${result}`, 'success')
+    }
+
+    if (presetImages.length > 0) {
+      addLog(`✓ 已添加 ${presetImages.length} 个预设图片`, 'success')
+    }
+
+    addLog('✓ 脚本添加完成！', 'success')
+  } catch (e) {
+    addLog(`✗ 操作失败：${e}`, 'error')
+  } finally {
+    executing.value = false
+  }
 }
 </script>
 

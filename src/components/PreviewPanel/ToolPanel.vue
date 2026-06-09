@@ -72,7 +72,7 @@ const tabs = [
   },
   {
     id: 'addScript',
-    label: '添加脚本',
+    label: '为皮肤添加脚本',
   }
 ]
 </script>

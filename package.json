@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "npm run build:tools && tauri",
+    "build:tools": "node scripts/build-tools.cjs",
+    "build:all": "npm run build:tools && npm run build",
+    "tauri:build": "npm run build:all && tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",

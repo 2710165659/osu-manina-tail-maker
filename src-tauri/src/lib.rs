@@ -23,6 +23,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             render_preview,
             export_image,
+            export_image_bytes,
             validate_config,
             get_presets,
             get_default_config,
@@ -31,6 +32,9 @@ pub fn run() {
             open_url,
             parse_image_to_preset,
             get_image_preview_top,
+            get_external_tool_path,
+            copy_external_tool_with_presets,
+            add_external_tool_to_osk_with_presets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
