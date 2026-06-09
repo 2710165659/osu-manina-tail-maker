@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>osu!mania Tail Maker - 外部工具</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  </head>
+  <body>
+    <div class="container">
+      <!-- 顶部装饰条 -->
+      <div class="panel-stripe"></div>
+
+      <!-- 标题栏 -->
+      <header class="panel-header">
+        <div class="header-left">
+          <div class="tool-icon-wrap">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M7.5 1.5L3 6l4.5 4.5L12 6 7.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+              <path d="M3 12l4.5 4.5L12 12" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+              <circle cx="14" cy="4" r="2.5" stroke="currentColor" stroke-width="1.2" />
+              <path d="M14 2.5v3M12.5 4h3" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="header-text">
+            <h2 class="panel-title">osu!mania Tail Maker External Tool</h2>
+            <span class="panel-subtitle">External Tool</span>
+          </div>
+        </div>
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="github-link" title="GitHub">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+        </a>
+      </header>
+
+      <!-- 主内容区域 -->
+      <main class="panel-body">
+        <!-- 介绍卡片 -->
+        <div class="desc-card">
+          <p class="desc-text">
+            一键修改 osu!mania 皮肤面尾投的长度，切换预设样式。支持单独修改 4K、7K 等不同键数的配置，还可顺带修复 lazer 版本引起的面尾变形问题。
+          </p>
+        </div>
+
+        <!-- 配置区域 -->
+        <div class="config-group">
+          <!-- 预设选择（如果有预设图片才显示） -->
+          <div class="field hidden" id="preset-section">
+            <label class="field-label">可替换的预设</label>
+            <div class="preset-grid" id="preset-grid">
+              <!-- 预设图片将通过 JS 动态插入 -->
+            </div>
+            <span class="field-hint">选择预设作为转换的基础样式（单选，可不选）</span>
+          </div>
+
+          <!-- 键数选择 -->
+          <div class="field">
+            <label class="field-label">针对不同轨道数量</label>
+            <div class="key-grid" id="key-grid">
+              <!-- 键数选项将通过 JS 动态插入 -->
+            </div>
+            <span class="field-hint">选择需要修改的键数配置（可多选）</span>
+          </div>
+
+          <!-- 投的长度 -->
+          <div class="field">
+            <label class="field-label">投的长度</label>
+            <div class="input-wrapper">
+              <input type="number" id="throw-length" class="field-input" placeholder="120" min="1" />
+              <span class="input-suffix">px</span>
+            </div>
+            <span class="field-hint">设置目标投的长度值</span>
+          </div>
+
+          <!-- 转换按钮 -->
+          <div class="field">
+            <button type="button" class="btn btn-primary btn-full" id="convert-btn">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>转换</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 日志区域 -->
+        <div class="log-section">
+          <div class="log-header">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.1" />
+              <path d="M3.5 4h5M3.5 6h3M3.5 8h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
+            </svg>
+            <span>日志</span>
+          </div>
+          <div class="log-content" id="log-content">
+            <div class="log-empty">
+              <span class="log-empty-icon">~</span>
+              <span>等待操作...</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>

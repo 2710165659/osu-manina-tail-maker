@@ -7,10 +7,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Runtime data
+node_modules/
+dist/
+dist-ssr/
+target/
+.env
 
 # Editor directories and files
 .vscode/*
@@ -24,9 +26,8 @@ dist-ssr
 *.sw?
 
 # Rust / Cargo
-src-tauri/target/
-src-tauri-tools/target/
-**/*.rs.bk
+*.rs.bk
+**/gen/schemas/
 
 # other
 .codegraph/
