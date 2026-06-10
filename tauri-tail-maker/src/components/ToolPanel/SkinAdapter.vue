@@ -1,26 +1,17 @@
 <template>
-  <div class="tail-repair">
+  <div class="skin-adapter">
     <!-- 描述卡片 -->
     <div class="desc-card">
-      <p class="desc-text">修复投皮转换为 lazer 后，面尾拉伸或KeyD等图片拉伸的问题。支持单个图片修复和整个皮肤修复</p>
+      <p class="desc-text">修复投皮转换为 lazer 后，面尾拉伸或 KeyD 等图片拉伸的问题。支持按皮肤或 osk 文件批量修复。</p>
     </div>
 
     <!-- 配置区域 -->
     <div class="config-group">
-      <!-- 修复模式 -->
+      <!-- 皮肤选择 -->
       <div class="field">
-        <label class="field-label">修复模式</label>
-        <div class="radio-cards radio-cards-3">
-          <label :class="['radio-card', { active: repairMode === 'osk' }]" @click="repairMode = 'osk'">
-            <div class="radio-dot">
-              <div class="radio-dot-inner"></div>
-            </div>
-            <div class="radio-content">
-              <span class="radio-title">osk 文件</span>
-              <span class="radio-desc">选择 .osk 文件，自动解析并修复有问题的图片。</span>
-            </div>
-          </label>
-          <label :class="['radio-card', { active: repairMode === 'folder' }]" @click="repairMode = 'folder'">
+        <label class="field-label">皮肤选择</label>
+        <div class="radio-cards">
+          <label :class="['radio-card', { active: skinMode === 'folder' }]" @click="skinMode = 'folder'">
             <div class="radio-dot">
               <div class="radio-dot-inner"></div>
             </div>
@@ -29,13 +20,42 @@
               <span class="radio-desc">选择皮肤所在文件夹，根据 skin.ini 查找并修复。</span>
             </div>
           </label>
-          <label :class="['radio-card', { active: repairMode === 'single' }]" @click="repairMode = 'single'">
+          <label :class="['radio-card', { active: skinMode === 'osk' }]" @click="skinMode = 'osk'">
             <div class="radio-dot">
               <div class="radio-dot-inner"></div>
             </div>
             <div class="radio-content">
-              <span class="radio-title">单个图片</span>
-              <span class="radio-desc">修复单张图片，需填写 ColumnWidth 值。</span>
+              <span class="radio-title">osk 文件</span>
+              <span class="radio-desc">选择 .osk 文件，自动解析并修复有问题的图片。</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 修复模式 (可多选) -->
+      <div class="field">
+        <label class="field-label">修复模式</label>
+        <div class="checkbox-cards">
+          <label :class="['check-card', { active: repairModes.has('tail') }]" @click="toggleRepairMode('tail')">
+            <div class="checkbox-box">
+              <svg v-if="repairModes.has('tail')" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div class="checkbox-content">
+              <span class="checkbox-title">面尾</span>
+              <span class="checkbox-desc">修复面尾图片因 ColumnWidth 导致的拉伸问题。</span>
+            </div>
+          </label>
+          <label :class="['check-card', { active: repairModes.has('keyd') }]" @click="toggleRepairMode('keyd')">
+            <div class="checkbox-box">
+              <svg v-if="repairModes.has('keyd')" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div class="checkbox-content">
+              <span class="checkbox-title">Key + KeyD</span>
+              <span class="checkbox-desc">修复 KeyImage# 和 KeyImage#D 图片因尺寸不一致导致的问题。</span>
             </div>
           </label>
         </div>
@@ -45,40 +65,26 @@
       <div class="field">
         <label class="field-label">是否备份原始文件</label>
         <div class="radio-cards">
-          <label :class="['radio-card', { active: !backupOriginal }]" @click="backupOriginal = false">
+          <label :class="['radio-card', { active: doBackup }]" @click="doBackup = true">
             <div class="radio-dot">
               <div class="radio-dot-inner"></div>
             </div>
             <div class="radio-content">
               <span class="radio-title">备份</span>
-              <span class="radio-desc">覆盖原始图片，同时将原始图片复制到 _backup 文件夹。</span>
+              <span class="radio-desc">覆盖前将原始图片备份到 _backup 文件夹。</span>
             </div>
           </label>
-          <label :class="['radio-card', { active: backupOriginal }]" @click="backupOriginal = true">
+          <label :class="['radio-card', { active: !doBackup }]" @click="doBackup = false">
             <div class="radio-dot">
               <div class="radio-dot-inner"></div>
             </div>
             <div class="radio-content">
               <span class="radio-title">不备份</span>
-              <span class="radio-desc">直接覆盖原始图片进行修复。</span>
+              <span class="radio-desc">直接覆盖原始图片。</span>
             </div>
           </label>
         </div>
-        <span class="field-hint"></span>
       </div>
-
-      <!-- ColumnWidth 输入 -->
-      <Transition name="slide-fade">
-        <div v-if="repairMode === 'single'" class="field">
-          <label class="field-label">ColumnWidth 值</label>
-          <div class="input-wrapper">
-            <input type="number" v-model.number="columnWidth" class="field-input"
-              placeholder="skin.ini 中的 ColumnWidth" />
-            <span class="input-suffix">px</span>
-          </div>
-          <span class="field-hint">对应 skin.ini 中 [Mania] 小节的 ColumnWidth 值</span>
-        </div>
-      </Transition>
 
       <!-- 文件路径 -->
       <div class="field">
@@ -104,7 +110,7 @@
       <!-- 操作按钮 -->
       <div class="field">
         <button class="btn btn-primary btn-full" @click="handleRepair" :disabled="!canRepair">
-          <span>开始修复</span>
+          <span>{{ repairing ? '修复中...' : '开始修复' }}</span>
         </button>
       </div>
     </div>
@@ -138,16 +144,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, reactive, nextTick, watch } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 
-const repairMode = ref<'osk' | 'folder' | 'single'>('osk')
-const columnWidth = ref<number>(0)
+const skinMode = ref<'osk' | 'folder'>('folder')
 const filePath = ref('')
 
-watch(repairMode, () => {
+watch(skinMode, () => {
   filePath.value = ''
 })
-const backupOriginal = ref(false)
+
+// 修复模式：面尾、KeyD，默认全选
+const repairModes = reactive(new Set<string>(['tail', 'keyd']))
+
+function toggleRepairMode(mode: string) {
+  if (repairModes.has(mode)) {
+    repairModes.delete(mode)
+  } else {
+    repairModes.add(mode)
+  }
+}
+
+const doBackup = ref(true)
+const repairing = ref(false)
 const logContainer = ref<HTMLDivElement>()
 
 interface LogEntry {
@@ -159,14 +178,14 @@ interface LogEntry {
 const logs = ref<LogEntry[]>([])
 
 const pathPlaceholder = computed(() => {
-  if (repairMode.value === 'osk') return '请选择 .osk 文件'
-  if (repairMode.value === 'folder') return '请选择皮肤所在文件夹'
-  return '请选择图片文件'
+  if (skinMode.value === 'osk') return '请选择 .osk 文件'
+  return '请选择皮肤所在文件夹'
 })
 
 const canRepair = computed(() => {
   if (!filePath.value) return false
-  if (repairMode.value === 'single' && columnWidth.value <= 0) return false
+  if (repairing.value) return false
+  if (repairModes.size === 0) return false
   return true
 })
 
@@ -187,23 +206,15 @@ async function handleBrowse() {
   try {
     let selected: string | string[] | null = null
 
-    if (repairMode.value === 'osk') {
-      // osk 文件模式：只允许选择 .osk 文件
+    if (skinMode.value === 'osk') {
       selected = await open({
         multiple: false,
         filters: [{ name: 'osk 文件', extensions: ['osk'] }],
       })
-    } else if (repairMode.value === 'folder') {
-      // 皮肤文件夹模式：选择目录
+    } else {
       selected = await open({
         multiple: false,
         directory: true,
-      })
-    } else {
-      // 单个图片模式：选择图片文件
-      selected = await open({
-        multiple: false,
-        filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'webp'] }],
       })
     }
 
@@ -217,38 +228,98 @@ async function handleBrowse() {
   }
 }
 
-function handleRepair() {
+async function handleRepair() {
   if (!canRepair.value) return
 
-  addLog('开始修复任务...', 'info')
-  const modeLabel = repairMode.value === 'osk' ? 'osk 文件' : repairMode.value === 'folder' ? '皮肤文件夹' : '单个图片'
-  addLog(`修复模式：${modeLabel}`, 'info')
+  // osk 模式：一键命令
+  if (skinMode.value === 'osk') {
+    const modes: string[] = []
+    if (repairModes.has('tail')) modes.push('tail')
+    if (repairModes.has('keyd')) modes.push('keyd')
 
-  if (repairMode.value === 'single') {
-    addLog(`ColumnWidth 值：${columnWidth.value}`, 'info')
+    repairing.value = true
+    addLog('开始 osk 文件修复...', 'info')
+    addLog(`文件：${filePath.value}`, 'info')
+    addLog(`修复模式：${[...repairModes].join('、')}`, 'info')
+    addLog(`备份：${doBackup.value ? '是' : '否'}`, 'info')
+
+    try {
+      const logLines: string[] = await invoke('repair_lazer_osk', {
+        oskPath: filePath.value,
+        backup: doBackup.value,
+        modes,
+      })
+      for (const line of logLines) {
+        const type = classifyLog(line)
+        addLog(line, type)
+      }
+      addLog('osk 修复完成！', 'success')
+    } catch (e) {
+      addLog(`修复失败: ${e}`, 'error')
+    } finally {
+      repairing.value = false
+    }
+    return
   }
 
-  addLog(`文件路径：${filePath.value}`, 'info')
-  addLog(`备份原始文件：${backupOriginal.value ? '是' : '否'}`, 'info')
-  addLog('正在分析图片尺寸...', 'info')
+  // 文件夹模式
+  repairing.value = true
+  addLog('开始修复任务...', 'info')
+  addLog(`皮肤目录：${filePath.value}`, 'info')
 
-  setTimeout(() => {
-    addLog('检测到需要修复的图片：3 个', 'warning')
-    addLog('正在转换图片尺寸...', 'info')
-  }, 500)
+  const repairLabels: string[] = []
+  if (repairModes.has('tail')) repairLabels.push('面尾')
+  if (repairModes.has('keyd')) repairLabels.push('KeyD')
+  addLog(`修复模式：${repairLabels.join('、')}`, 'info')
+  addLog(`备份原始文件：${doBackup.value ? '是' : '否'}`, 'info')
 
-  setTimeout(() => {
-    addLog('图片 1/3 修复完成', 'success')
-    addLog('图片 2/3 修复完成', 'success')
-    addLog('图片 3/3 修复完成', 'success')
-    addLog('修复任务完成！共修复 3 张图片', 'success')
-  }, 1500)
+  try {
+    // 面尾修复
+    if (repairModes.has('tail')) {
+      addLog('--- 面尾修复 ---', 'info')
+      const logLines: string[] = await invoke('repair_lazer_tail_folder', {
+        folderPath: filePath.value,
+        backup: doBackup.value,
+      })
+      for (const line of logLines) {
+        const type = classifyLog(line)
+        addLog(line, type)
+      }
+    }
+
+    // Key 图片修复 (KeyImage# + KeyImage#D)
+    if (repairModes.has('keyd')) {
+      addLog('--- Key 图片修复 ---', 'info')
+      const logLines: string[] = await invoke('repair_key_image_folder', {
+        folderPath: filePath.value,
+        backup: doBackup.value,
+        mode: 'all',
+      })
+      for (const line of logLines) {
+        const type = classifyLog(line)
+        addLog(line, type)
+      }
+    }
+
+    addLog('全部修复任务完成！', 'success')
+  } catch (e) {
+    addLog(`修复失败: ${e}`, 'error')
+  } finally {
+    repairing.value = false
+  }
+}
+
+/// 根据日志内容猜测日志类型
+function classifyLog(msg: string): LogEntry['type'] {
+  if (msg.startsWith('  ✓') || msg.includes('完成') || msg.includes('均存在')) return 'success'
+  if (msg.startsWith('  ✗') || msg.startsWith('发现') || msg.includes('⚠')) return 'warning'
+  return 'info'
 }
 
 </script>
 
 <style scoped>
-.tail-repair {
+.skin-adapter {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -296,10 +367,6 @@ function handleRepair() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-}
-
-.radio-cards-3 {
-  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .radio-card {
@@ -370,6 +437,72 @@ function handleRepair() {
   color: var(--text-muted);
 }
 
+/* Checkbox Cards — multi-select */
+.checkbox-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.check-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.check-card:hover {
+  border-color: rgba(183, 108, 241, 0.3);
+  background: rgba(183, 108, 241, 0.03);
+}
+
+.check-card.active {
+  border-color: var(--accent-purple);
+  background: rgba(183, 108, 241, 0.06);
+}
+
+.checkbox-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all 0.2s ease;
+  color: var(--accent-purple);
+}
+
+.check-card.active .checkbox-box {
+  border-color: var(--accent-purple);
+  background: var(--accent-purple);
+  color: white;
+}
+
+.checkbox-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkbox-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.checkbox-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
 /* Input */
 .input-wrapper {
   display: flex;
@@ -396,7 +529,6 @@ function handleRepair() {
   outline: none;
 }
 
-/* 隐藏数字输入框的上下箭头 */
 .field-input[type="number"]::-webkit-inner-spin-button,
 .field-input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;

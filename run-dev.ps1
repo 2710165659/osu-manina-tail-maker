@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
 $TauriDir = Join-Path $ProjectRoot "tauri-tail-maker"
 $ToolsDir = Join-Path $ProjectRoot "tauri-tail-maker-external"
+$SharedDir = Join-Path $ProjectRoot "shared"
 $ExePath = Join-Path $ToolsDir "target" "release" "tail-maker-external.exe"
 $SrcDir = Join-Path $ToolsDir "src"
 $FrontendDir = Join-Path $ToolsDir "frontend"
@@ -31,7 +32,7 @@ if (-not (Test-Path $SrcDir)) {
 
         # 获取所有源文件的最新修改时间
         $srcLatest = if (Test-Path $SrcDir) {
-            (Get-ChildItem -Path $SrcDir -Recurse -File -ErrorAction SilentlyContinue |
+            (Get-ChildItem -Path $SrcDir, $SharedDir -Recurse -File -ErrorAction SilentlyContinue |
                 Sort-Object LastWriteTime -Descending |
                 Select-Object -First 1).LastWriteTime
         } else { [datetime]::MinValue }
@@ -54,11 +55,11 @@ if (-not (Test-Path $SrcDir)) {
 
     if ($needBuild) {
         Write-Host "🔨 开始编译小工具..." -ForegroundColor Cyan
-        Push-Location $ToolsDir
+        Push-Location $ProjectRoot
         try {
-            cargo build --release
+            cargo build --release -p tail-maker-external
             if ($LASTEXITCODE -ne 0) {
-                throw "cargo build --release 失败 (exit code: $LASTEXITCODE)"
+                throw "cargo build --release -p tail-maker-external 失败 (exit code: $LASTEXITCODE)"
             }
             Write-Host "✅ 小工具编译完成" -ForegroundColor Green
         } finally {

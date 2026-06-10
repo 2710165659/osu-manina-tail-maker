@@ -35,6 +35,12 @@ pub fn run() {
             get_external_tool_path,
             copy_external_tool_with_presets,
             add_external_tool_to_osk_with_presets,
+            repair_lazer_tail_folder,
+            repair_key_image_folder,
+            repair_lazer_osk,
+            get_skin_throw_info,
+            modify_skin_throw_length,
+            validate_skin_files_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

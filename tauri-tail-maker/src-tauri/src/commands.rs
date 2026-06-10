@@ -8,10 +8,15 @@ use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 /// 用默认浏览器打开 URL（包装 shared 库）
+/// @2x 后缀标记
+fn is2x_tag(path: &std::path::Path) -> &'static str {
+    if shared::image_utils::is_2x(path) { " (@2x)" } else { "" }
+}
+
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
     shared::open_url(&url)
@@ -429,4 +434,956 @@ pub fn add_external_tool_to_osk_with_presets(
         .map_err(|e| format!("替换原文件失败: {}", e))?;
 
     Ok("scripts/tail-maker-external.exe".to_string())
+}
+
+// ---------------------------------------------------------------------------
+// 工具箱命令 —— 包装 shared 库
+// ---------------------------------------------------------------------------
+
+/// 修改 skin.ini 中某个 [Mania] 节下某个 NoteImage<col>L 的值。
+/// 重新读取文件，按 Keys 定位小节，按列号匹配 NoteImage<col>L 行。
+fn _update_note_image_l_in_ini(
+    ini_path: &PathBuf,
+    keys: u32,
+    col: u32,
+    new_value: &str,
+) -> Result<(), String> {
+    let content = fs::read_to_string(ini_path)
+        .map_err(|e| format!("读取 skin.ini 失败: {}", e))?;
+
+    let target_key = format!("NoteImage{}L", col).to_lowercase();
+    let lines: Vec<&str> = content.lines().collect();
+    let mut new_lines: Vec<String> = Vec::with_capacity(lines.len());
+    let mut in_target_mania = false;
+    let mut section_keys: Option<u32> = None;
+    let mut found = false;
+
+    for line in &lines {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_target_mania = trimmed.eq_ignore_ascii_case("[Mania]");
+            section_keys = None;
+        }
+
+        if in_target_mania {
+            // Keys:
+            if let Some(val) = shared::skin_ini::try_parse_key(trimmed, "Keys:") {
+                section_keys = val.parse::<u32>().ok();
+            }
+
+            // 确认是目标小节 + 匹配 NoteImage<col>L
+            if section_keys == Some(keys) && trimmed.to_lowercase().starts_with(&target_key) {
+                if let Some(colon_pos) = line.find(':') {
+                    let before = &line[..colon_pos + 1];
+                    new_lines.push(format!("{} {}", before, new_value));
+                    found = true;
+                    continue;
+                }
+            }
+        }
+
+        new_lines.push(line.to_string());
+    }
+
+    if !found {
+        return Err(format!(
+            "未在 {}k 小节中找到 NoteImage{}L 行",
+            keys, col
+        ));
+    }
+
+    fs::write(ini_path, new_lines.join("\n"))
+        .map_err(|e| format!("写入 skin.ini 失败: {}", e))?;
+    Ok(())
+}
+
+/// 修改 skin.ini 中某个 [Mania] 节下 KeyImage# 或 KeyImage#D 的值。
+/// `is_d`: true 匹配 KeyImage#D，false 匹配 KeyImage#。
+fn _update_key_image_in_ini(
+    ini_path: &PathBuf,
+    keys: u32,
+    col: u32,
+    is_d: bool,
+    new_value: &str,
+) -> Result<(), String> {
+    let content = fs::read_to_string(ini_path)
+        .map_err(|e| format!("读取 skin.ini 失败: {}", e))?;
+
+    // KeyImage#D 必须在 KeyImage# 之前检测（D 后缀更长）
+    let target_prefix = if is_d {
+        format!("KeyImage{}D", col).to_lowercase()
+    } else {
+        format!("KeyImage{}", col).to_lowercase()
+    };
+    let suffix_char = if is_d { "D" } else { "" };
+    let lines: Vec<&str> = content.lines().collect();
+    let mut new_lines: Vec<String> = Vec::with_capacity(lines.len());
+    let mut in_target_mania = false;
+    let mut section_keys: Option<u32> = None;
+    let mut found = false;
+
+    for line in &lines {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_target_mania = trimmed.eq_ignore_ascii_case("[Mania]");
+            section_keys = None;
+        }
+
+        if in_target_mania {
+            if let Some(val) = shared::skin_ini::try_parse_key(trimmed, "Keys:") {
+                section_keys = val.parse::<u32>().ok();
+            }
+
+            if section_keys == Some(keys) {
+                let lower = trimmed.to_lowercase();
+                // 精确匹配：KeyImage{col}D: 或 KeyImage{col}:（排除 KeyImage{col}D 当 is_d=false）
+                let exact_prefix = format!("KeyImage{}:", col).to_lowercase();
+                let exact_prefix_d = format!("KeyImage{}D:", col).to_lowercase();
+                let matched = if is_d {
+                    lower.starts_with(&exact_prefix_d)
+                } else {
+                    lower.starts_with(&exact_prefix) && !lower.starts_with(&exact_prefix_d)
+                };
+                if matched {
+                    if let Some(colon_pos) = line.find(':') {
+                        let before = &line[..colon_pos + 1];
+                        new_lines.push(format!("{} {}", before, new_value));
+                        found = true;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        new_lines.push(line.to_string());
+    }
+
+    if !found {
+        let label = if is_d { "KeyImage#D" } else { "KeyImage#" };
+        return Err(format!(
+            "未在 {}k 小节中找到 {}{} 行",
+            keys, label, col
+        ));
+    }
+
+    fs::write(ini_path, new_lines.join("\n"))
+        .map_err(|e| format!("写入 skin.ini 失败: {}", e))?;
+    Ok(())
+}
+
+// ---- Tail repair (面尾修复, NoteImage#L) ----
+
+/// Lazer 面尾修复（皮肤文件夹模式）
+///
+/// 对所有 NoteImage#L 面尾图片执行：宽→ColumnWidth×1.6，高等比缩放。
+/// >32800 裁切底部，<32800 底部平铺补足。
+/// 不同 ColumnWidth 但同一图片 → 复制图片，修改 skin.ini。
+#[tauri::command]
+pub fn repair_lazer_tail_folder(folder_path: String, backup: bool) -> Result<Vec<String>, String> {
+    let dir = PathBuf::from(&folder_path);
+    if !dir.is_dir() {
+        return Err("指定的路径不是有效的文件夹".to_string());
+    }
+
+    let ini_path = dir.join("skin.ini");
+    if !ini_path.exists() {
+        return Err("未找到 skin.ini 文件".to_string());
+    }
+
+    let mut log: Vec<String> = Vec::new();
+    let add_log = |log: &mut Vec<String>, msg: &str| log.push(msg.to_string());
+    let ts_dir = backup_timestamp();
+
+    let skin_ini = shared::skin_ini::parse_skin_ini(&ini_path)?;
+    add_log(
+        &mut log,
+        &format!("解析到 {} 个 [Mania] 小节", skin_ini.mania_sections.len()),
+    );
+
+    let groups = shared::skin_ini::group_note_image_l_by_stem(&skin_ini.mania_sections);
+    add_log(&mut log, &format!("共 {} 组不同的面尾图片", groups.len()));
+
+    // 收集需要 ini 修改的项（最后统一处理以保持行号稳定）
+    let mut ini_patches: Vec<(u32, u32, String)> = Vec::new(); // (keys, col, new_stem)
+
+    for (stem, refs) in &groups {
+        let image_path = shared::skin_ini::find_image_file(&dir, stem)
+            .ok_or_else(|| format!("找不到面尾图片: {}", stem))?;
+
+        let img = image::open(&image_path)
+            .map_err(|e| format!("读取图片失败 {}: {}", stem, e))?
+            .to_rgba8();
+
+        // 不同 (keys, cw) 组合
+        let mut unique_cw: Vec<u32> = refs.iter().map(|(_, cw)| *cw).collect();
+        unique_cw.sort();
+        unique_cw.dedup();
+
+        add_log(&mut log, &format!("处理: {} ({} 个键数/列宽组合)", stem, refs.len()));
+
+        if unique_cw.len() == 1 {
+            let cw = unique_cw[0];
+            let repaired = shared::tail_repair::repair_tail_image(&img, cw);
+            backup_file(&dir, &image_path, backup, &ts_dir)?;
+            repaired
+                .save(&image_path)
+                .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+            add_log(&mut log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+        } else {
+            // 多个 ColumnWidth — 第一个覆盖原文件，其余复制
+            let ext = image_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("png");
+            let first_cw = unique_cw[0];
+            let repaired = shared::tail_repair::repair_tail_image(&img, first_cw);
+            backup_file(&dir, &image_path, backup, &ts_dir)?;
+            repaired
+                .save(&image_path)
+                .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+            add_log(&mut log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, first_cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+
+            for &cw in &unique_cw[1..] {
+                let repaired_cw = shared::tail_repair::repair_tail_image(&img, cw);
+                let copy_stem = format!("{}_cw{}", stem, cw);
+                let copy_path = dir.join(format!("{}.{}", copy_stem, ext));
+                repaired_cw
+                    .save(&copy_path)
+                    .map_err(|e| format!("保存副本失败 {}: {}", copy_stem, e))?;
+
+                // 找到对应 cw 的列并记录 ini 修改（每个 NoteImage#L 行都需要更新）
+                for (keys_k, _) in refs.iter().filter(|(_, c)| *c == cw) {
+                    for sec in &skin_ini.mania_sections {
+                        if sec.keys == *keys_k && sec.column_width == cw {
+                            for r in &sec.note_image_ls {
+                                if r.name == *stem {
+                                    ini_patches.push((*keys_k, r.column, copy_stem.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
+                add_log(&mut log, &format!("  ✓ {}: cw={} → {}×{} (副本: {}){}", stem, cw, repaired_cw.width(), repaired_cw.height(), copy_stem, is2x_tag(&copy_path)));
+            }
+        }
+    }
+
+    // 统一应用 ini 修改
+    for (keys, col, new_stem) in &ini_patches {
+        _update_note_image_l_in_ini(&ini_path, *keys, *col, new_stem)?;
+        add_log(&mut log, &format!("  已更新 NoteImage{}L → {}", col, new_stem));
+    }
+
+    add_log(&mut log, "修复完成！");
+    Ok(log)
+}
+
+/// osk 文件解压、修复后再打包
+fn repair_in_work_dir(
+    osk_path: &Path,
+    backup: bool,
+    repair_modes: &std::collections::HashSet<&str>,
+    log: &mut Vec<String>,
+    add_log: &dyn Fn(&mut Vec<String>, &str),
+) -> Result<(), String> {
+    let parent = osk_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    let work_dir = parent.join(format!(
+        "_osk_repair_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    ));
+
+    // 1. 解压 osk → work_dir
+    let osk_file = fs::File::open(osk_path)
+        .map_err(|e| format!("打开 osk 文件失败: {}", e))?;
+    let mut archive = zip::ZipArchive::new(osk_file)
+        .map_err(|e| format!("读取 zip 失败: {}", e))?;
+
+    fs::create_dir_all(&work_dir)
+        .map_err(|e| format!("创建临时目录失败: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
+        let name = file.name().to_string();
+        if name.ends_with('/') || name.ends_with('\\') {
+            fs::create_dir_all(work_dir.join(&name)).ok();
+            continue;
+        }
+        if let Some(p) = work_dir.join(&name).parent() {
+            fs::create_dir_all(p).ok();
+        }
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf)
+            .map_err(|e| format!("读取条目内容失败: {}", e))?;
+        fs::write(work_dir.join(&name), &buf)
+            .map_err(|e| format!("写入临时文件失败: {}", e))?;
+    }
+    add_log(log, &format!("已解压到临时目录"));
+
+    // 检测 osk 解压后是否有一层嵌套目录（如 LazerSkin/skin.ini 而非直接 skin.ini）
+    let extract_root = work_dir.clone();  // 保留提取根目录用于清理
+    let mut work_dir = extract_root.clone();
+    let ini_path = work_dir.join("skin.ini");
+    if !ini_path.exists() {
+        // 查找正好一个子目录且里面有 skin.ini
+        let subdirs: Vec<PathBuf> = fs::read_dir(&work_dir)
+            .map_err(|e| format!("读取临时目录失败: {}", e))?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir() && !e.file_name().to_string_lossy().starts_with('_'))
+            .map(|e| e.path())
+            .collect();
+        if subdirs.len() == 1 && subdirs[0].join("skin.ini").exists() {
+            work_dir = subdirs[0].clone();
+            add_log(log, &format!("检测到嵌套目录: {}", work_dir.file_name().unwrap_or_default().to_string_lossy()));
+        }
+    }
+
+    // 在 work_dir 上修复
+    let ini_path = work_dir.join("skin.ini");
+    if ini_path.exists() {
+        let skin_ini = shared::skin_ini::parse_skin_ini(&ini_path)?;
+
+        // 面尾修复
+        if repair_modes.contains("tail") {
+            let ts_dir = backup_timestamp();
+            add_log(log, "--- 面尾修复 ---");
+            let groups = shared::skin_ini::group_note_image_l_by_stem(&skin_ini.mania_sections);
+            add_log(log, &format!("共 {} 组不同的面尾图片", groups.len()));
+            let mut ini_patches: Vec<(u32, u32, String)> = Vec::new();
+
+            for (stem, refs) in &groups {
+                let image_path = match shared::skin_ini::find_image_file(&work_dir, stem) {
+                    Some(p) => p,
+                    None => {
+                        add_log(log, &format!("⚠ 找不到面尾图片: {}", stem));
+                        continue;
+                    }
+                };
+                let img = image::open(&image_path)
+                    .map_err(|e| format!("读取图片失败 {}: {}", stem, e))?
+                    .to_rgba8();
+
+                let mut unique_cw: Vec<u32> = refs.iter().map(|(_, cw)| *cw).collect();
+                unique_cw.sort();
+                unique_cw.dedup();
+
+                if unique_cw.len() == 1 {
+                    let cw = unique_cw[0];
+                    let repaired = shared::tail_repair::repair_tail_image(&img, cw);
+                    backup_file(&work_dir, &image_path, backup, &ts_dir)?;
+                    repaired.save(&image_path)
+                        .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+                    add_log(log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+                } else {
+                    let ext = image_path.extension().and_then(|e| e.to_str()).unwrap_or("png");
+                    let first_cw = unique_cw[0];
+                    let repaired = shared::tail_repair::repair_tail_image(&img, first_cw);
+                    backup_file(&work_dir, &image_path, backup, &ts_dir)?;
+                    repaired.save(&image_path)
+                        .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+                    add_log(log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, first_cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+                    for &cw in &unique_cw[1..] {
+                        let repaired_cw = shared::tail_repair::repair_tail_image(&img, cw);
+                        let copy_stem = format!("{}_cw{}", stem, cw);
+                        let copy_path = work_dir.join(format!("{}.{}", copy_stem, ext));
+                        repaired_cw.save(&copy_path)
+                            .map_err(|e| format!("保存副本失败 {}: {}", copy_stem, e))?;
+
+                        // 收集 ini 更新：找到对应 cw 的 keys/col
+                        for (keys_k, _cw_k) in refs.iter().filter(|(_, c)| *c == cw) {
+                            for sec in &skin_ini.mania_sections {
+                                if sec.keys == *keys_k && sec.column_width == cw {
+                                    for r in &sec.note_image_ls {
+                                        if r.name == *stem {
+                                            ini_patches.push((*keys_k, r.column, copy_stem.clone()));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        add_log(log, &format!("  ✓ {}: cw={} → {}×{} (副本: {}){}", stem, cw, repaired_cw.width(), repaired_cw.height(), copy_stem, is2x_tag(&copy_path)));
+                    }
+                }
+            }
+
+            // 应用 ini 修改
+            for (keys, col, new_stem) in &ini_patches {
+                if let Err(e) = _update_note_image_l_in_ini(&ini_path, *keys, *col, new_stem) {
+                    add_log(log, &format!("⚠ 更新 skin.ini 失败 ({}k col={}): {}", keys, col, e));
+                } else {
+                    add_log(log, &format!("  已更新 NoteImage{}L → {}", col, new_stem));
+                }
+            }
+        }
+
+        // Key 修复
+        if repair_modes.contains("keyd") {
+            let ts_dir = backup_timestamp();
+            add_log(log, "--- Key + KeyD 修复 ---");
+            let groups = shared::skin_ini::group_key_images_by_stem(&skin_ini.mania_sections);
+            add_log(log, &format!("共 {} 组不同的 Key 图片", groups.len()));
+            let mut ini_patches: Vec<(u32, u32, bool, String)> = Vec::new();
+
+            for (stem, refs) in &groups {
+                let image_path = match shared::skin_ini::find_image_file(&work_dir, stem) {
+                    Some(p) => p,
+                    None => {
+                        add_log(log, &format!("⚠ 找不到 Key 图片: {}", stem));
+                        continue;
+                    }
+                };
+                let img = image::open(&image_path)
+                    .map_err(|e| format!("读取图片失败 {}: {}", stem, e))?
+                    .to_rgba8();
+
+                let mut unique_cw: Vec<u32> = refs.iter().map(|(_, cw)| *cw).collect();
+                unique_cw.sort();
+                unique_cw.dedup();
+
+                let is_2x = shared::image_utils::is_2x(&image_path);
+
+                if unique_cw.len() == 1 {
+                    let cw = unique_cw[0];
+                    let repaired = shared::keyd_repair::repair_key_image(&img, cw, is_2x);
+                    backup_file(&work_dir, &image_path, backup, &ts_dir)?;
+                    repaired.save(&image_path)
+                        .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+                    add_log(log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+                } else {
+                    let ext = image_path.extension().and_then(|e| e.to_str()).unwrap_or("png");
+                    let first_cw = unique_cw[0];
+                    let repaired = shared::keyd_repair::repair_key_image(&img, first_cw, is_2x);
+                    backup_file(&work_dir, &image_path, backup, &ts_dir)?;
+                    repaired.save(&image_path)
+                        .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+                    add_log(log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, first_cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+
+                    for &cw in &unique_cw[1..] {
+                        let repaired_cw = shared::keyd_repair::repair_key_image(&img, cw, is_2x);
+                        let copy_stem = format!("{}_cw{}", stem, cw);
+                        let copy_path = work_dir.join(format!("{}.{}", copy_stem, ext));
+                        repaired_cw.save(&copy_path)
+                            .map_err(|e| format!("保存副本失败 {}: {}", copy_stem, e))?;
+
+                        for (keys_k, _) in refs.iter().filter(|(_, c)| *c == cw) {
+                            for sec in &skin_ini.mania_sections {
+                                if sec.keys == *keys_k && sec.column_width == cw {
+                                    for r in &sec.key_image_ds {
+                                        if r.name == *stem {
+                                            ini_patches.push((*keys_k, r.column, true, copy_stem.clone()));
+                                        }
+                                    }
+                                    for r in &sec.key_images {
+                                        if r.name == *stem {
+                                            ini_patches.push((*keys_k, r.column, false, copy_stem.clone()));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        add_log(log, &format!("  ✓ {}: cw={} → {}×{} (副本: {}){}", stem, cw, repaired_cw.width(), repaired_cw.height(), copy_stem, is2x_tag(&copy_path)));
+                    }
+                }
+            }
+
+            // 应用 ini 修改
+            let ini_path = work_dir.join("skin.ini");
+            for (keys, col, is_d, new_stem) in &ini_patches {
+                match _update_key_image_in_ini(&ini_path, *keys, *col, *is_d, new_stem) {
+                    Ok(()) => {
+                        let label = if *is_d { "KeyImage#D" } else { "KeyImage#" };
+                        add_log(log, &format!("  已更新 {}{} → {}", label, col, new_stem));
+                    }
+                    Err(e) => add_log(log, &format!("⚠ {}", e)),
+                }
+            }
+        }
+    }
+
+    // 3. 重新打包 → 覆盖原 osk
+    let temp_osk = osk_path.with_extension("osk.tmp");
+    let temp_file = fs::File::create(&temp_osk)
+        .map_err(|e| format!("创建临时 osk 失败: {}", e))?;
+    let mut writer = zip::ZipWriter::new(temp_file);
+
+    add_files_to_zip(&work_dir, &work_dir, &mut writer)?;
+    writer.finish().map_err(|e| format!("完成 zip 写入失败: {}", e))?;
+
+    // 清理临时目录
+    let _ = fs::remove_dir_all(&extract_root);
+    // 替换
+    fs::rename(&temp_osk, osk_path)
+        .map_err(|e| format!("替换原 osk 文件失败: {}", e))?;
+    add_log(log, "已重新打包 osk 文件");
+
+    Ok(())
+}
+
+/// Lazer 皮肤修复（osk 文件模式）
+///
+/// 解压 → 修复 → 重新打包。`modes`: ["tail"] / ["keyd"] / ["tail","keyd"]
+#[tauri::command]
+pub fn repair_lazer_osk(
+    osk_path: String,
+    backup: bool,
+    modes: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let path = PathBuf::from(&osk_path);
+    if !path.exists() || !path.is_file() {
+        return Err("osk 文件不存在".to_string());
+    }
+
+    let mode_set: std::collections::HashSet<&str> = modes.iter().map(|s| s.as_str()).collect();
+    let mut log: Vec<String> = Vec::new();
+    let add_log_fn: &dyn Fn(&mut Vec<String>, &str) = &|l, msg| l.push(msg.to_string());
+
+    add_log_fn(&mut log, "开始 osk 文件修复...");
+    repair_in_work_dir(&path, backup, &mode_set, &mut log, add_log_fn)?;
+    add_log_fn(&mut log, "osk 修复完成！");
+
+    Ok(log)
+}
+
+/// 递归将目录下文件添加到 zip（跳过 _backup）
+fn add_files_to_zip(
+    base: &Path,
+    dir: &Path,
+    writer: &mut zip::ZipWriter<fs::File>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))? {
+        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
+        let path = entry.path();
+        let relative = path
+            .strip_prefix(base)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        // 跳过 _backup
+        if relative.starts_with("_backup") {
+            continue;
+        }
+
+        if path.is_dir() {
+            add_files_to_zip(base, &path, writer)?;
+        } else {
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            writer
+                .start_file(&*relative, options)
+                .map_err(|e| format!("创建 zip 条目失败: {}", e))?;
+            let buf = fs::read(&path)
+                .map_err(|e| format!("读取文件失败: {}", e))?;
+            writer
+                .write_all(&buf)
+                .map_err(|e| format!("写入 zip 条目失败: {}", e))?;
+        }
+    }
+    Ok(())
+}
+
+// ---- Key image repair (KeyImage# + KeyImage#D) ----
+
+/// Key 图片修复（皮肤文件夹模式）
+///
+/// 对 KeyImage# 和 KeyImage#D 图片执行等比缩放修复算法。
+/// `mode`: "keyd" 只修 KeyImage#D，"key" 只修 KeyImage#，"all" 两者都修。
+#[tauri::command]
+pub fn repair_key_image_folder(
+    folder_path: String,
+    backup: bool,
+    mode: String,
+) -> Result<Vec<String>, String> {
+    let dir = PathBuf::from(&folder_path);
+    if !dir.is_dir() {
+        return Err("指定的路径不是有效的文件夹".to_string());
+    }
+
+    let ini_path = dir.join("skin.ini");
+    if !ini_path.exists() {
+        return Err("未找到 skin.ini 文件".to_string());
+    }
+
+    let mut log: Vec<String> = Vec::new();
+    let add_log = |log: &mut Vec<String>, msg: &str| log.push(msg.to_string());
+    let ts_dir = backup_timestamp();
+
+    let skin_ini = shared::skin_ini::parse_skin_ini(&ini_path)?;
+
+    let include_d = mode == "keyd" || mode == "all";
+    let include_key = mode == "key" || mode == "all";
+
+    // 按图片茎分组，收集所有 (keys, cw) 引用
+    let mut groups = shared::skin_ini::group_key_images_by_stem(&skin_ini.mania_sections);
+    // 根据 mode 过滤：只保留包含目标类型引用的组
+    if !include_d || !include_key {
+        groups.retain(|stem, _| {
+            let has_d = skin_ini.mania_sections.iter().any(|sec| sec.key_image_ds.iter().any(|r| &r.name == stem));
+            let has_key = skin_ini.mania_sections.iter().any(|sec| sec.key_images.iter().any(|r| &r.name == stem));
+            (include_d && has_d) || (include_key && has_key)
+        });
+    }
+
+    add_log(&mut log, &format!("共 {} 组不同的 Key 图片", groups.len()));
+
+    // 收集需要 ini 修改的项
+    let mut ini_patches: Vec<(u32, u32, bool, String)> = Vec::new(); // (keys, col, is_d, new_stem)
+
+    for (stem, refs) in &groups {
+        let image_path = match shared::skin_ini::find_image_file(&dir, stem) {
+            Some(p) => p,
+            None => {
+                add_log(&mut log, &format!("⚠ 找不到 Key 图片: {}", stem));
+                continue;
+            }
+        };
+
+        let img = image::open(&image_path)
+            .map_err(|e| format!("读取图片失败 {}: {}", stem, e))?
+            .to_rgba8();
+
+        let mut unique_cw: Vec<u32> = refs.iter().map(|(_, cw)| *cw).collect();
+        unique_cw.sort();
+        unique_cw.dedup();
+
+        let is_2x = shared::image_utils::is_2x(&image_path);
+
+        add_log(&mut log, &format!("处理: {} ({} 个键数/列宽组合)", stem, refs.len()));
+
+        if unique_cw.len() == 1 {
+            let cw = unique_cw[0];
+            let repaired = shared::keyd_repair::repair_key_image(&img, cw, is_2x);
+            backup_file(&dir, &image_path, backup, &ts_dir)?;
+            repaired.save(&image_path)
+                .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+            add_log(&mut log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+        } else {
+            let ext = image_path.extension().and_then(|e| e.to_str()).unwrap_or("png");
+            let first_cw = unique_cw[0];
+            let repaired = shared::keyd_repair::repair_key_image(&img, first_cw, is_2x);
+            backup_file(&dir, &image_path, backup, &ts_dir)?;
+            repaired.save(&image_path)
+                .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+            add_log(&mut log, &format!("  ✓ {}: cw={} → {}×{}{}", stem, first_cw, repaired.width(), repaired.height(), is2x_tag(&image_path)));
+
+            for &cw in &unique_cw[1..] {
+                let repaired_cw = shared::keyd_repair::repair_key_image(&img, cw, is_2x);
+                let copy_stem = format!("{}_cw{}", stem, cw);
+                let copy_path = dir.join(format!("{}.{}", copy_stem, ext));
+                repaired_cw.save(&copy_path)
+                    .map_err(|e| format!("保存副本失败 {}: {}", copy_stem, e))?;
+
+                // 收集 ini 更新
+                for (keys_k, _) in refs.iter().filter(|(_, c)| *c == cw) {
+                    for sec in &skin_ini.mania_sections {
+                        if sec.keys == *keys_k && sec.column_width == cw {
+                            for r in &sec.key_image_ds {
+                                if r.name == *stem {
+                                    ini_patches.push((*keys_k, r.column, true, copy_stem.clone()));
+                                }
+                            }
+                            for r in &sec.key_images {
+                                if r.name == *stem {
+                                    ini_patches.push((*keys_k, r.column, false, copy_stem.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
+                add_log(&mut log, &format!("  ✓ {}: cw={} → {}×{} (副本: {}){}", stem, cw, repaired_cw.width(), repaired_cw.height(), copy_stem, is2x_tag(&copy_path)));
+            }
+        }
+    }
+
+    // 统一应用 ini 修改
+    for (keys, col, is_d, new_stem) in &ini_patches {
+        match _update_key_image_in_ini(&ini_path, *keys, *col, *is_d, new_stem) {
+            Ok(()) => {
+                let label = if *is_d { "KeyImage#D" } else { "KeyImage#" };
+                add_log(&mut log, &format!("  已更新 {}{} → {}", label, col, new_stem));
+            }
+            Err(e) => add_log(&mut log, &format!("⚠ {}", e)),
+        }
+    }
+
+    add_log(&mut log, "Key 图片修复完成！");
+    Ok(log)
+}
+
+// ---- Throw length ----
+
+/// 获取皮肤的投长度信息（按文件夹读取 skin.ini）
+///
+/// 返回每个有 NoteImage#L 的键数的：键数、图片茎、当前投长度、图片高度、是否合规（高>5000）。
+#[derive(Debug, serde::Serialize)]
+pub struct SkinThrowInfo {
+    pub keys: u32,
+    pub stem: String,
+    pub current_throw: u32,
+    pub height: u32,
+    pub valid: bool,
+    pub is_2x: bool,
+}
+
+#[tauri::command]
+pub fn get_skin_throw_info(folder_path: String) -> Result<Vec<SkinThrowInfo>, String> {
+    let dir = PathBuf::from(&folder_path);
+    if !dir.is_dir() {
+        return Err("指定的路径不是有效的文件夹".to_string());
+    }
+
+    let ini_path = dir.join("skin.ini");
+    if !ini_path.exists() {
+        return Err("未找到 skin.ini 文件".to_string());
+    }
+
+    let skin_ini = shared::skin_ini::parse_skin_ini(&ini_path)?;
+    let mut results: Vec<SkinThrowInfo> = Vec::new();
+
+    for section in &skin_ini.mania_sections {
+        if section.note_image_ls.is_empty() {
+            continue;
+        }
+
+        // 收集该小节所有唯一的图片茎
+        let mut stems: Vec<String> = section
+            .note_image_ls
+            .iter()
+            .map(|r| r.name.clone())
+            .collect();
+        stems.sort();
+        stems.dedup();
+
+        for stem in &stems {
+            let (current_throw, height, valid, is_2x) = match shared::skin_ini::find_image_file(&dir, stem) {
+                Some(p) => {
+                    let is_2x = shared::image_utils::is_2x(&p);
+                    match image::open(&p) {
+                        Ok(img) => {
+                            let rgba = img.to_rgba8();
+                            let (ok, h) = shared::throw_length::validate_tail_image(&rgba);
+                            (shared::throw_length::find_throw_length(&rgba), h, ok, is_2x)
+                        }
+                        Err(_) => (0, 0, false, is_2x),
+                    }
+                }
+                None => (0, 0, false, false),
+            };
+
+            results.push(SkinThrowInfo {
+                keys: section.keys,
+                stem: stem.clone(),
+                current_throw,
+                height,
+                valid,
+                is_2x,
+            });
+        }
+    }
+
+    Ok(results)
+}
+
+/// 修改投长度（皮肤文件夹模式）
+///
+/// `keys` 与 `throws` 一一对应，每个键数可设不同的目标投长度。
+#[tauri::command]
+pub fn modify_skin_throw_length(
+    folder_path: String,
+    keys: Vec<u32>,
+    throws: Vec<u32>,
+    backup: bool,
+) -> Result<Vec<String>, String> {
+    if keys.len() != throws.len() || keys.is_empty() {
+        return Err("keys 与 throws 长度不匹配或为空".to_string());
+    }
+
+    let dir = PathBuf::from(&folder_path);
+    if !dir.is_dir() {
+        return Err("指定的路径不是有效的文件夹".to_string());
+    }
+
+    let ini_path = dir.join("skin.ini");
+    if !ini_path.exists() {
+        return Err("未找到 skin.ini 文件".to_string());
+    }
+
+    // 构建 keys → target_throw 映射
+    let throw_map: std::collections::HashMap<u32, u32> = keys
+        .iter()
+        .zip(throws.iter())
+        .map(|(&k, &t)| (k, t))
+        .collect();
+
+    let skin_ini = shared::skin_ini::parse_skin_ini(&ini_path)?;
+    let mut log: Vec<String> = Vec::new();
+    let add_log = |log: &mut Vec<String>, msg: &str| log.push(msg.to_string());
+
+    let mut seen = std::collections::HashSet::new();
+    let mut processed = false;
+    let ts_dir = backup_timestamp();
+
+    for section in &skin_ini.mania_sections {
+        let target_throw = match throw_map.get(&section.keys) {
+            Some(&t) => t,
+            None => continue,
+        };
+
+        for r in &section.note_image_ls {
+            if !seen.insert(r.name.clone()) {
+                continue;
+            }
+
+            let image_path = match shared::skin_ini::find_image_file(&dir, &r.name) {
+                Some(p) => p,
+                None => {
+                    add_log(&mut log, &format!("⚠ 找不到面尾图片: {} ({}k)", r.name, section.keys));
+                    continue;
+                }
+            };
+
+            let img = image::open(&image_path)
+                .map_err(|e| format!("读取图片失败 {}: {}", r.name, e))?
+                .to_rgba8();
+
+            let current_throw = shared::throw_length::find_throw_length(&img);
+            add_log(
+                &mut log,
+                &format!("{}k: 投长度 {}px → {}px", section.keys, current_throw, target_throw),
+            );
+
+            let modified = shared::throw_length::modify_throw_length(&img, target_throw);
+            backup_file(&dir, &image_path, backup, &ts_dir)?;
+            modified
+                .save(&image_path)
+                .map_err(|e| format!("保存失败 {}: {}", r.name, e))?;
+            add_log(&mut log, &format!("  ✓ {} 已保存", image_path.display()));
+            processed = true;
+        }
+    }
+
+    if !processed {
+        add_log(&mut log, "未找到匹配的键数小节");
+    } else {
+        add_log(&mut log, "修改完成！");
+    }
+
+    Ok(log)
+}
+
+// ---- Validator ----
+
+/// 皮肤文件校验
+///
+/// 检查 NoteImage#L、KeyImage#D、KeyImage# 引用的图片是否存在。
+#[tauri::command]
+pub fn validate_skin_files_cmd(folder_path: String) -> Result<Vec<String>, String> {
+    let dir = PathBuf::from(&folder_path);
+    if !dir.is_dir() {
+        return Err("指定的路径不是有效的文件夹".to_string());
+    }
+
+    let ini_path = dir.join("skin.ini");
+    if !ini_path.exists() {
+        return Err("未找到 skin.ini 文件".to_string());
+    }
+
+    let skin_ini = shared::skin_ini::parse_skin_ini(&ini_path)?;
+    let missing = shared::skin_validator::validate_skin_files(&skin_ini);
+
+    if missing.is_empty() {
+        Ok(vec!["所有图片文件均存在 ✓".to_string()])
+    } else {
+        let mut log: Vec<String> = vec![format!("发现 {} 个缺失文件:", missing.len())];
+        for m in &missing {
+            let keys_str: Vec<String> = m.keys.iter().map(|k| format!("{}k", k)).collect();
+            log.push(format!("  ✗ [{}] {} (引用自: {})", m.image_type, m.stem, keys_str.join(", ")));
+        }
+        Ok(log)
+    }
+}
+
+// ---- Helpers ----
+
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// 生成备份时间戳目录名（UTC+8，一次操作只调一次）
+fn backup_timestamp() -> String {
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        + 28800; // UTC+8
+    let secs_of_day = ts % 86400;
+    let days_since_epoch = ts / 86400;
+    let (y, m, d) = epoch_to_date(days_since_epoch);
+    let h = secs_of_day / 3600;
+    let min = (secs_of_day % 3600) / 60;
+    let s = secs_of_day % 60;
+    format!("{:04}-{:02}-{:02}_{:02}-{:02}-{:02}", y, m, d, h, min, s)
+}
+
+fn backup_file(skin_dir: &PathBuf, file_path: &PathBuf, do_backup: bool, ts_dir: &str) -> Result<(), String> {
+    if !do_backup {
+        return Ok(());
+    }
+
+    let backup_root = skin_dir.join("_backup").join(ts_dir);
+    fs::create_dir_all(&backup_root).map_err(|e| format!("创建备份目录失败: {}", e))?;
+
+    let relative = file_path
+        .strip_prefix(skin_dir)
+        .unwrap_or_else(|_| Path::new(file_path.file_name().unwrap_or_default()));
+    let flat_name = relative
+        .to_string_lossy()
+        .replace(['/', '\\'], "-");
+
+    let backup_path = backup_root.join(&flat_name);
+    if backup_path.exists() {
+        return Ok(());
+    }
+    fs::copy(file_path, &backup_path).map_err(|e| format!("备份失败: {}", e))?;
+    Ok(())
+}
+
+/// 粗糙的 Unix epoch days → (year, month, day)
+fn epoch_to_date(days: u64) -> (u64, u64, u64) {
+    // 以 1970-01-01 为起点计算
+    let mut y = 1970u64;
+    let mut remaining = days as i64;
+    loop {
+        let days_in_year = if is_leap(y) { 366 } else { 365 };
+        if remaining < days_in_year {
+            break;
+        }
+        remaining -= days_in_year;
+        y += 1;
+    }
+    let month_days = if is_leap(y) {
+        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+    let mut m = 1u64;
+    for md in month_days.iter() {
+        if remaining < *md {
+            break;
+        }
+        remaining -= *md;
+        m += 1;
+    }
+    let d = remaining as u64 + 1;
+    (y, m, d)
+}
+
+fn is_leap(y: u64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
 }

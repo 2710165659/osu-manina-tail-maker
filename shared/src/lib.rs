@@ -1,3 +1,10 @@
+pub mod image_utils;
+pub mod keyd_repair;
+pub mod skin_ini;
+pub mod skin_validator;
+pub mod tail_repair;
+pub mod throw_length;
+
 /// 用默认浏览器打开 URL
 ///
 /// 每个 Tauri app 用 `#[tauri::command]` 包装此函数来注册为 IPC 命令。

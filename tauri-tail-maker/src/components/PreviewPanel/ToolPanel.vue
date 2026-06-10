@@ -41,9 +41,11 @@
         <!-- 内容区域 - 固定高度 -->
         <main class="tool-body">
           <Transition name="tool-switch" mode="out-in">
-            <TailRepair v-if="activeTab === 'tailRepair'" key="tailRepair" />
+            <SkinAdapter v-if="activeTab === 'skinAdapter'" key="skinAdapter" />
+            <OneClickLength v-else-if="activeTab === 'oneClickLength'" key="oneClickLength" />
             <BatchGenerate v-else-if="activeTab === 'batchGenerate'" key="batchGenerate" />
             <AddScript v-else-if="activeTab === 'addScript'" key="addScript" />
+            <SkinValidator v-else-if="activeTab === 'skinValidator'" key="skinValidator" />
           </Transition>
         </main>
       </div>
@@ -53,18 +55,24 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import TailRepair from '../ToolPanel/TailRepair.vue'
+import SkinAdapter from '../ToolPanel/SkinAdapter.vue'
+import OneClickLength from '../ToolPanel/OneClickLength.vue'
 import BatchGenerate from '../ToolPanel/BatchGenerate.vue'
 import AddScript from '../ToolPanel/AddScript.vue'
+import SkinValidator from '../ToolPanel/SkinValidator.vue'
 
 const emit = defineEmits<{ close: [] }>()
 
-const activeTab = ref('tailRepair')
+const activeTab = ref('skinAdapter')
 
 const tabs = [
   {
-    id: 'tailRepair',
-    label: 'lazer面尾适配',
+    id: 'skinAdapter',
+    label: 'lazer皮肤适配',
+  },
+  {
+    id: 'oneClickLength',
+    label: '一键修改投长度',
   },
   {
     id: 'batchGenerate',
@@ -73,6 +81,10 @@ const tabs = [
   {
     id: 'addScript',
     label: '为皮肤添加脚本',
+  },
+  {
+    id: 'skinValidator',
+    label: '皮肤文件校验',
   }
 ]
 </script>
@@ -101,8 +113,8 @@ const tabs = [
 }
 
 .tool-panel {
-  width: 680px;
-  max-width: 92vw;
+  width: 720px;
+  max-width: 94vw;
   height: 620px;
   max-height: 85vh;
   background: var(--bg-panel);
