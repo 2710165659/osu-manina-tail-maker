@@ -1,0 +1,27 @@
+/// 用默认浏览器打开 URL
+///
+/// 每个 Tauri app 用 `#[tauri::command]` 包装此函数来注册为 IPC 命令。
+pub fn open_url(url: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", url])
+            .spawn()
+            .map_err(|e| format!("打开链接失败: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| format!("打开链接失败: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| format!("打开链接失败: {}", e))?;
+    }
+    Ok(())
+}

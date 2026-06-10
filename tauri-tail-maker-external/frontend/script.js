@@ -26,6 +26,7 @@ const keyGrid = $("key-grid");
 const throwLengthInput = $("throw-length");
 const convertBtn = $("convert-btn");
 const logContent = $("log-content");
+const githubLink = $("github-link");
 
 // ============================================
 // Log System
@@ -189,6 +190,13 @@ throwLengthInput.addEventListener("keydown", (e) => {
     handleConvert();
   }
 });
+
+// GitHub 链接 — 用默认浏览器打开
+if (githubLink) {
+  githubLink.addEventListener("click", () => {
+    invoke("open_url", { url: "https://github.com/2710165659/osu-manina-tail-maker" });
+  });
+}
 
 // ============================================
 // Find Skin Root

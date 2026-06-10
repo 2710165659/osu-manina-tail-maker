@@ -31,3 +31,4 @@ target/
 
 # other
 .codegraph/
+.reasonix/

@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "tauri-tail-maker/src-tauri",
+    "tauri-tail-maker-external",
+    "shared",
+]
+resolver = "2"

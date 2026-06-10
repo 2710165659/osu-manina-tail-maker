@@ -167,7 +167,7 @@ body::before {
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
-  text-decoration: none;
+  cursor: pointer;
 }
 
 .github-link:hover {

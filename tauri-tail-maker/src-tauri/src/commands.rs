@@ -11,6 +11,12 @@ use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 use tauri::Manager;
 
+/// 用默认浏览器打开 URL（包装 shared 库）
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    shared::open_url(&url)
+}
+
 /// 渲染预览图（全宽，最多 1000 行），返回 base64 编码的 PNG
 #[tauri::command]
 pub fn render_preview(config: TailConfig) -> Result<String, String> {
@@ -114,33 +120,6 @@ pub fn save_user_presets(app: tauri::AppHandle, presets: Vec<Preset>) -> Result<
 #[tauri::command]
 pub fn get_default_config() -> TailConfig {
     TailConfig::default_config()
-}
-
-/// 用默认浏览器打开 URL
-#[tauri::command]
-pub fn open_url(url: String) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(["/c", "start", "", &url])
-            .spawn()
-            .map_err(|e| format!("打开链接失败: {}", e))?;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("打开链接失败: {}", e))?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("打开链接失败: {}", e))?;
-    }
-    Ok(())
 }
 
 /// 缓存目录：%LOCALAPPDATA%/osu-mania-tail-maker/cache
