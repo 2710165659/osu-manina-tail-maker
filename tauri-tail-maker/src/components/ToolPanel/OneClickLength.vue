@@ -1,11 +1,32 @@
 <template>
   <div class="one-click-length">
     <div class="desc-card">
-      <p class="desc-text">一键修改皮肤中面尾的投机取巧长度。选择皮肤文件夹，为不同键数设定各自的目标长度，批量修改。已 lazer 适配的皮肤可在此随意调整，不受影响。</p>
+      <p class="desc-text">一键修改面尾。为不同键数设定目标投长度，可选预设替换面尾图片、修复 Key/KeyD 拉伸。此操作会将原始文件备份到皮肤根目录下的 _backup 文件夹。</p>
     </div>
 
     <div class="config-group">
-      <!-- 皮肤文件夹 -->
+      <!-- 修复模式 -->
+      <div class="field">
+        <label class="field-label">修复模式</label>
+        <div class="radio-cards">
+          <label :class="['radio-card', { active: workMode === 'lazer' }]" @click="workMode = 'lazer'">
+            <div class="radio-dot"><div class="radio-dot-inner"></div></div>
+            <div class="radio-content">
+              <span class="radio-title">Lazer</span>
+              <span class="radio-desc">修改投长度后拉伸到 ColumnWidth×1.6 32800。</span>
+            </div>
+          </label>
+          <label :class="['radio-card', { active: workMode === 'stable' }]" @click="workMode = 'stable'">
+            <div class="radio-dot"><div class="radio-dot-inner"></div></div>
+            <div class="radio-content">
+              <span class="radio-title">Stable</span>
+              <span class="radio-desc">仅修改投长度，不拉伸图片。</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 皮肤文件夹路径 -->
       <div class="field">
         <label class="field-label">皮肤文件夹</label>
         <div class="path-group">
@@ -14,72 +35,118 @@
               <path d="M1.5 7.5v3.5a1 1 0 001 1h9a1 1 0 001-1V7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
               <path d="M7 1.5v6M4.5 5L7 7.5 9.5 5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            <span class="path-text" :class="{ placeholder: !folderPath }">
-              {{ folderPath || '请选择皮肤所在文件夹' }}
-            </span>
+            <span class="path-text" :class="{ placeholder: !filePath }">{{ filePath || '请选择皮肤所在文件夹' }}</span>
           </div>
-          <button class="browse-btn" @click="handleBrowse">
-            <span>浏览</span>
-          </button>
+          <button class="browse-btn" @click="handleBrowse"><span>浏览</span></button>
         </div>
       </div>
 
-      <!-- 键数 + 投长度 -->
-      <div class="field">
-        <label class="field-label">目标键数 &amp; 投机取巧长度</label>
-        <div class="key-length-list" v-if="skinInfo.length > 0">
-          <div v-for="info in uniqueKeyInfos" :key="info.keys" :class="['kl-row', { active: throwMap.has(info.keys), invalid: !info.valid }]">
-            <label class="kl-check">
-              <input type="checkbox" :checked="throwMap.has(info.keys)" :disabled="!info.valid" @change="toggleKey(info.keys)" />
-              <span class="kl-label">{{ info.keys }}k</span>
-            </label>
-            <span v-if="!info.valid" class="kl-badge" title="图片高度不满足 >5000 要求">不合规</span>
-            <span v-else class="kl-current">{{ info.current_throw }}px <span v-if="info.is_2x" class="kl-2x">(@2x)</span></span>
-            <div class="kl-input-wrap" v-if="throwMap.has(info.keys) && info.valid">
-              <input
-                type="number"
-                class="kl-input"
-                :value="throwMap.get(info.keys)"
-                @input="e => throwMap.set(info.keys, Number((e.target as HTMLInputElement).value))"
-                placeholder="px"
-                min="1"
-              />
-              <span class="kl-suffix">px</span>
+      <!-- ===== 区块 A: Key/KeyD 修复列表（仅 Lazer） ===== -->
+      <div class="field" v-if="workMode === 'lazer'">
+        <label class="field-label">Key/KeyD 修复<span v-if="filePath && keydInfos.length > 0"> ({{ keydChecked.size }}/{{ keydInfos.length }})</span></label>
+        <template v-if="filePath && keydInfos.length > 0">
+            <span class="field-hint">共 {{ keydInfos.length }} 张 Key/KeyD 图片</span>
+            <div class="repair-scroll">
+              <div class="repair-grid">
+                <label v-for="kd in keydInfos" :key="kd.stem" :class="['repair-item', { active: keydChecked.has(kd.stem) }]">
+                  <input type="checkbox" :checked="keydChecked.has(kd.stem)" @change="toggleKeyd(kd.stem)" />
+                  <span class="ri-stem">{{ kd.stem }}</span>
+                  <span v-if="kd.as_key.length > 0" class="ri-tag ri-key">Key</span>
+                  <span v-if="kd.as_keyd.length > 0" class="ri-tag ri-keyd">KeyD</span>
+                </label>
+              </div>
             </div>
-          </div>
-        </div>
-        <div v-else class="key-length-empty">
-          <span v-if="!folderPath">请先选择皮肤文件夹</span>
-          <span v-else>未检测到 NoteImage#L 面尾定义</span>
-        </div>
-        <span class="field-hint">勾选需要修改的键数，输入目标投长度。默认为当前投长度。</span>
+            <span class="field-hint">勾选需要修复的 Key/KeyD 图片。</span>
+          </template>
+        <div v-else-if="filePath && loadingInfo" class="repair-placeholder">正在加载...</div>
+        <div v-else-if="filePath && !loadingInfo" class="repair-placeholder">未找到 Key/KeyD 图片</div>
+        <div v-else class="repair-placeholder">请先选择皮肤文件夹路径</div>
       </div>
 
-      <!-- 备份 -->
+      <!-- ===== 区块 B: 预设替换 ===== -->
       <div class="field">
-        <label class="field-label">是否备份原始文件</label>
-        <div class="radio-cards">
-          <label :class="['radio-card', { active: doBackup }]" @click="doBackup = true">
-            <div class="radio-dot"><div class="radio-dot-inner"></div></div>
-            <div class="radio-content">
-              <span class="radio-title">备份</span>
-              <span class="radio-desc">覆盖前将原图备份到 _backup 文件夹。</span>
+        <label class="field-label">预设替换<span v-if="filePath && imageKeyInfos.length > 0"> ({{ presetCount }}/{{ imageKeyInfos.length }})</span></label>
+        <template v-if="filePath && imageKeyInfos.length > 0">
+          <span class="field-hint">共 {{ imageKeyInfos.length }} 张面尾图片可替换</span>
+          <div class="preset-scroll">
+            <div class="preset-table">
+              <div v-for="ik in imageKeyInfos" :key="ik.stem" class="preset-row">
+                <span class="psr-stem" :title="ik.image_path">{{ ik.stem }}</span>
+                <div class="psr-usage">
+                  <span v-for="u in ik.used_by" :key="u.keys" class="ps-usage-item">{{ u.keys }}k (列{{ u.columns.join(',') }})</span>
+                </div>
+                <div class="psr-preset">
+                  <div v-if="stemPresets[ik.stem]" class="preset-selected" @click="openPresetDialog(ik.stem)">
+                    <img v-if="stemPresets[ik.stem]?.image_path" :src="presetSrc(stemPresets[ik.stem]!.image_path)" class="preset-thumb" />
+                    <span class="preset-name-sm">{{ stemPresets[ik.stem]!.name }}</span>
+                    <button class="preset-clear" @click.stop="stemPresets[ik.stem] = null">×</button>
+                  </div>
+                  <button v-else class="preset-pick-btn" @click="openPresetDialog(ik.stem)">选择预设</button>
+                </div>
+              </div>
             </div>
-          </label>
-          <label :class="['radio-card', { active: !doBackup }]" @click="doBackup = false">
-            <div class="radio-dot"><div class="radio-dot-inner"></div></div>
-            <div class="radio-content">
-              <span class="radio-title">不备份</span>
-              <span class="radio-desc">直接覆盖原始图片。</span>
+          </div>
+          <span class="field-hint">为每张面尾图片选择预设替换。同一 stem 被多个键数共享时只需选一次。</span>
+        </template>
+        <div v-else-if="filePath && loadingInfo" class="repair-placeholder">正在加载...</div>
+        <div v-else-if="filePath && !loadingInfo" class="repair-placeholder">未找到面尾图片</div>
+        <div v-else class="repair-placeholder">请先选择皮肤文件夹路径</div>
+      </div>
+
+      <!-- ===== 区块 C: 修改投长度 ===== -->
+      <div class="field">
+        <label class="field-label">修改投长度<span v-if="filePath && uniqueKeyInfos.length > 0"> ({{ throwMap.size }}/{{ uniqueKeyInfos.length }})</span></label>
+        <template v-if="filePath && uniqueKeyInfos.length > 0">
+          <span class="field-hint">共 {{ uniqueKeyInfos.length }} 个键数<span v-if="computingThrows"> — 正在计算投长度...</span></span>
+          <div class="throw-scroll">
+            <div class="throw-grid">
+              <div v-for="info in uniqueKeyInfos" :key="info.keys" :class="['throw-card', { active: throwMap.has(info.keys), invalid: !info.valid }]">
+                <label class="tc-check">
+                  <input type="checkbox" :checked="throwMap.has(info.keys)" :disabled="!info.valid" @change="toggleKey(info.keys)" />
+                  <span class="tc-keys">{{ info.keys }}k</span>
+                </label>
+                <input
+                  type="number" class="tc-input"
+                  :value="throwMap.get(info.keys) ?? ''"
+                  :disabled="!throwMap.has(info.keys) || !info.valid"
+                  @input="e => throwMap.set(info.keys, Number((e.target as HTMLInputElement).value))"
+                  placeholder="-" min="1"
+                />
+                <span class="tc-orig">{{ info.valid ? `原: ${getModeThrow(info)}` : '不合规' }}</span>
+              </div>
             </div>
-          </label>
-        </div>
+          </div>
+          <span class="field-hint">勾选键数并输入目标投长度。</span>
+        </template>
+        <div v-else-if="filePath && loadingInfo" class="repair-placeholder">正在加载...</div>
+        <div v-else-if="filePath && !loadingInfo" class="repair-placeholder">未检测到 NoteImage#L 面尾定义</div>
+        <div v-else class="repair-placeholder">请先选择皮肤文件夹路径</div>
       </div>
 
       <div class="field">
         <button class="btn btn-primary btn-full" @click="handleModify" :disabled="!canModify">
           <span>{{ modifying ? '修改中...' : '开始修改' }}</span>
         </button>
+      </div>
+    </div>
+
+    <!-- 预设选择对话框 -->
+    <div class="modal-overlay" v-if="presetDialogStem !== null" @mousedown.self="presetDialogStem = null">
+      <div class="preset-modal">
+        <div class="modal-header">
+          <span class="modal-title">选择预设 - {{ presetDialogStem }}</span>
+          <button class="modal-close" @click="presetDialogStem = null">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="preset-grid">
+            <div v-for="preset in presets" :key="preset.name" :class="['preset-card', { active: stemPresets[presetDialogStem]?.name === preset.name }]" @click="selectPreset(presetDialogStem, preset)">
+              <div class="preset-img-wrap">
+                <img :src="presetSrc(preset.image_path)" class="preset-img" />
+              </div>
+              <span class="preset-label">{{ preset.name }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -109,46 +176,79 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { ref, reactive, computed, nextTick, watch } from 'vue'
+import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 
-const folderPath = ref('')
-const throwMap = reactive(new Map<number, number>())
-const skinInfo = ref<SkinThrowInfo[]>([])
-const doBackup = ref(true)
-const modifying = ref(false)
-const logContainer = ref<HTMLDivElement>()
-
-interface SkinThrowInfo {
-  keys: number
-  stem: string
-  current_throw: number
-  height: number
-  valid: boolean
-  is_2x: boolean
+function presetSrc(path: string): string {
+  return path.startsWith('data:') ? path : convertFileSrc(path)
 }
 
-function toggleKey(k: number) {
-  const info = skinInfo.value.find(s => s.keys === k)
-  if (!info?.valid) return  // 不合规不可勾选
-  if (throwMap.has(k)) {
-    throwMap.delete(k)
-  } else {
-    throwMap.set(k, info.current_throw)
-  }
-}
+// Folder path
+const filePath = ref('')
 
-const canModify = computed(() => {
-  if (!folderPath.value) return false
-  if (modifying.value) return false
-  if (throwMap.size === 0) return false
-  for (const v of throwMap.values()) {
-    if (!v || v < 1) return false
+// Work mode
+const workMode = ref<'lazer' | 'stable'>('lazer')
+
+// Recompute throwMap defaults when mode changes
+watch(workMode, () => {
+  if (skinInfo.value.length === 0) return
+  for (const [k] of throwMap) {
+    const s = skinInfo.value.find(i => i.keys === k)
+    if (s?.valid) {
+      const def = getModeThrow(s)
+      throwMap.set(k, typeof def === 'number' ? def : s.current_throw)
+    }
   }
-  return true
 })
 
-/// 按 keys 去重的 skinInfo（取第一个匹配的 stem/height/valid）
+// Throw info
+interface SkinThrowInfo {
+  keys: number; stem: string; column_width: number; current_throw: number; lazer_throw: number
+  height: number; valid: boolean; is_2x: boolean
+}
+const skinInfo = ref<SkinThrowInfo[]>([])
+const throwMap = reactive(new Map<number, number>())
+const loadingInfo = ref(false)
+
+function getModeThrow(info: SkinThrowInfo): number | string {
+  if (workMode.value === 'lazer') {
+    return info.lazer_throw > 0 ? info.lazer_throw : '…'
+  }
+  return info.current_throw
+}
+
+const computingThrows = ref(false)
+
+// Key/KeyD info
+interface KeydStemInfo { stem: string; as_key: number[]; as_keyd: number[] }
+const keydInfos = ref<KeydStemInfo[]>([])
+const keydChecked = reactive(new Set<string>())
+
+function toggleKeyd(stem: string) {
+  if (keydChecked.has(stem)) { keydChecked.delete(stem) }
+  else { keydChecked.add(stem) }
+}
+
+// Image-key info (preset section)
+interface KeyColumnEntry { keys: number; columns: number[] }
+interface ImageKeyInfo { stem: string; image_path: string; used_by: KeyColumnEntry[] }
+const imageKeyInfos = ref<ImageKeyInfo[]>([])
+
+// Presets
+interface PresetInfo { name: string; image_path: string }
+const presets = ref<PresetInfo[]>([])
+const stemPresets = reactive<Record<string, PresetInfo | null>>({})
+const presetDialogStem = ref<string | null>(null)
+
+// Log
+const modifying = ref(false)
+const logContainer = ref<HTMLDivElement>()
+interface LogEntry { time: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }
+const logs = ref<LogEntry[]>([])
+
+// Computed
+const presetCount = computed(() => Object.values(stemPresets).filter(Boolean).length)
+
 const uniqueKeyInfos = computed(() => {
   const seen = new Set<number>()
   return skinInfo.value.filter(s => {
@@ -158,8 +258,23 @@ const uniqueKeyInfos = computed(() => {
   }).sort((a, b) => a.keys - b.keys)
 })
 
-interface LogEntry { time: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }
-const logs = ref<LogEntry[]>([])
+const canModify = computed(() => {
+  if (!filePath.value) return false
+  if (modifying.value) return false
+  if (throwMap.size === 0) return false
+  for (const v of throwMap.values()) { if (!v || v < 1) return false }
+  return true
+})
+
+function toggleKey(k: number) {
+  const info = skinInfo.value.find(s => s.keys === k)
+  if (!info?.valid) return
+  if (throwMap.has(k)) { throwMap.delete(k) }
+  else {
+    const def = getModeThrow(info)
+    throwMap.set(k, typeof def === 'number' ? def : info.current_throw)
+  }
+}
 
 function addLog(msg: string, type: LogEntry['type'] = 'info') {
   const now = new Date()
@@ -173,70 +288,200 @@ async function handleBrowse() {
   try {
     const selected = await open({ multiple: false, directory: true })
     if (selected) {
-      folderPath.value = Array.isArray(selected) ? selected[0] : selected
-      addLog(`已选择：${folderPath.value}`, 'info')
-
-      // 加载 skin.ini 信息
-      try {
-        const info: SkinThrowInfo[] = await invoke('get_skin_throw_info', {
-          folderPath: folderPath.value,
-        })
-        skinInfo.value = info
-
-        // 按 keys 分组去重
-        const keySet = new Set(info.map(s => s.keys))
-        const keys = [...keySet].sort((a, b) => a - b)
-
-        // 清空旧的 throwMap，预填合规键数
-        throwMap.clear()
-        if (keys.length > 0) {
-          addLog(`检测到键数: ${keys.map(k => k + 'k').join(', ')}`, 'info')
-          for (const k of keys) {
-            const s = info.find(i => i.keys === k)
-            if (s?.valid) {
-              throwMap.set(k, s.current_throw)
-            }
-          }
-          // 不合规的键数提示
-          const invalid = info.filter(s => !s.valid)
-          for (const s of invalid) {
-            addLog(`⚠ ${s.keys}k ${s.stem}: 高度 ${s.height}px，不满足 >5000，不可修改`, 'warning')
-          }
-        } else {
-          addLog('未找到任何 NoteImage#L 面尾定义', 'warning')
-        }
-      } catch (e) {
-        addLog(`读取 skin.ini 失败：${e}`, 'error')
-      }
+      filePath.value = Array.isArray(selected) ? selected[0] : selected
+      addLog(`已选择：${filePath.value}`, 'info')
+      await loadAll()
     }
   } catch (e) {
-    addLog(`文件夹选择失败：${e}`, 'error')
+    addLog(`文件选择失败：${e}`, 'error')
   }
+}
+
+async function loadAll() {
+  loadingInfo.value = true
+  throwMap.clear()
+  throwCache.clear()
+  Object.keys(stemPresets).forEach(k => delete stemPresets[k])
+  keydChecked.clear()
+  keydInfos.value = []
+  imageKeyInfos.value = []
+  presets.value = []
+  skinInfo.value = []
+
+  // Phase 1: Key/KeyD
+  await loadKeydList()
+  // Phase 2: Presets
+  await loadPresetList()
+  // Phase 3: Throw info + computation
+  await loadThrowInfo()
+
+  loadingInfo.value = false
+}
+
+// Throw cache: key = stem → Promise<number> (column_width does not affect throw length)
+const throwCache = new Map<string, Promise<number>>()
+
+async function loadKeydList() {
+  if (workMode.value !== 'lazer') return
+  addLog('=== 检测 Key、KeyD ===', 'info')
+  try {
+    const kd: KeydStemInfo[] = await invoke('get_keyd_list', { folderPath: filePath.value })
+    keydInfos.value = kd
+    for (const k of kd) { keydChecked.add(k.stem) }
+    addLog(`已加载 ${kd.length} 个 Key/KeyD 图片`, 'success')
+  } catch (e) { addLog(`Key/KeyD 列表加载失败: ${e}`, 'warning'); keydInfos.value = [] }
+}
+
+async function loadPresetList() {
+  addLog('=== 加载预设 ===', 'info')
+  try {
+    const ik: ImageKeyInfo[] = await invoke('get_image_key_info', { folderPath: filePath.value })
+    imageKeyInfos.value = ik
+    addLog(`已加载 ${ik.length} 个图片关联`, 'info')
+  } catch (e) { addLog(`图片关联加载失败: ${e}`, 'warning'); imageKeyInfos.value = [] }
+
+  try {
+    const p: PresetInfo[] = await invoke('load_presets', { skinRoot: filePath.value })
+    presets.value = p
+    if (p.length > 0) addLog(`已加载 ${p.length} 个预设`, 'success')
+    else addLog('未找到预设图片', 'info')
+  } catch (e) { addLog(`预设加载失败: ${e}`, 'warning') }
+}
+
+async function loadThrowInfo() {
+  addLog('=== 计算投长度 ===', 'info')
+  try {
+    const info: SkinThrowInfo[] = await invoke('get_skin_throw_info', { folderPath: filePath.value })
+    skinInfo.value = info
+    addLog('皮肤信息读取完成', 'success')
+
+    const keySet = new Set(info.map(s => s.keys))
+    const keys = [...keySet].sort((a, b) => a - b)
+
+    if (keys.length > 0) {
+      addLog(`检测到键数: ${keys.map(k => k + 'k').join(', ')}`, 'info')
+      for (const s of info.filter(i => !i.valid)) {
+        addLog(`⚠ ${s.keys}k ${s.stem}: 高度 ${s.height}px，不满足 >5000，不可修改`, 'warning')
+      }
+    } else {
+      addLog('未找到任何 NoteImage#L 面尾定义', 'warning')
+    }
+
+    await computeAllThrows()
+  } catch (e) {
+    addLog(`读取皮肤信息失败：${e}`, 'error')
+  }
+}
+
+async function computeAllThrows() {
+  if (workMode.value !== 'lazer') return
+
+  // Dedup by stem only — column_width does not affect throw length
+  // (resize always targets 32800 height; vertical scan is width-independent)
+  const seenStems = new Set<string>()
+  const tasks: { stem: string; keys: string }[] = []
+
+  for (const s of skinInfo.value) {
+    if (!s.valid) continue
+    if (seenStems.has(s.stem)) continue
+    seenStems.add(s.stem)
+
+    const stem = s.stem
+    const keyList = [...new Set(skinInfo.value.filter(x => x.stem === stem).map(x => x.keys))]
+      .sort((a, b) => a - b).map(k => k + 'k').join(', ')
+
+    let promise = throwCache.get(stem)
+    if (!promise) {
+      addLog(`计算 ${stem} 投长度...`, 'info')
+      promise = invoke<number>('compute_lazer_throw_single', {
+        folderPath: filePath.value,
+        stem,
+        columnWidth: s.column_width,
+      })
+      throwCache.set(stem, promise)
+    }
+    tasks.push({ stem, keys: keyList })
+  }
+
+  if (tasks.length === 0) {
+    addLog('无需计算投长度', 'info')
+    return
+  }
+
+  computingThrows.value = true
+
+  // Run all computations in parallel
+  const results = await Promise.allSettled(
+    tasks.map(t => throwCache.get(t.stem)!)
+  )
+
+  computingThrows.value = false
+
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i]
+    const r = results[i]
+    if (r.status === 'fulfilled') {
+      const lt = r.value
+      for (const x of skinInfo.value) {
+        if (x.stem === t.stem) x.lazer_throw = lt
+      }
+      addLog(`  ✓ ${t.stem} (${t.keys}) 投长度: ${lt}`, 'success')
+    } else {
+      addLog(`  ✗ ${t.stem} 投长度计算失败: ${r.reason}`, 'warning')
+    }
+  }
+  addLog('投长度计算完成', 'success')
+}
+
+function openPresetDialog(stem: string) {
+  presetDialogStem.value = stem
+}
+
+function selectPreset(stem: string, preset: PresetInfo) {
+  stemPresets[stem] = preset
+  presetDialogStem.value = null
+  addLog(`${stem} 选择预设: ${preset.name}`, 'info')
 }
 
 async function handleModify() {
   if (!canModify.value) return
-
   modifying.value = true
+
+  addLog(`文件：${filePath.value}`, 'info')
+  addLog(`开始修改... 模式: ${workMode.value}`, 'info')
+
   const entries = [...throwMap.entries()].sort((a, b) => a[0] - b[0])
-  addLog('开始修改投机取巧长度...', 'info')
-  for (const [k, v] of entries) {
-    addLog(`  ${k}k → ${v}px`, 'info')
-  }
-  addLog(`备份：${doBackup.value ? '是' : '否'}`, 'info')
+  const throws: [number, number][] = entries.map(([k, v]) => [k, v])
+
+  // Build presets: stem → preset_name
+  const presetList: [string, string][] = Object.entries(stemPresets)
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([stem, v]) => [stem, v!.name])
+
+  // Build keyd_stems
+  const keydStems: string[] = [...keydChecked]
 
   try {
-    const logLines: string[] = await invoke('modify_skin_throw_length', {
-      folderPath: folderPath.value,
-      keys: entries.map(([k]) => k),
-      throws: entries.map(([, v]) => v),
-      backup: doBackup.value,
+    const result: { success: boolean; message: string; logs: string[] } = await invoke('convert_tail_toolbox', {
+      folderPath: filePath.value,
+      skinMode: 'folder',
+      workMode: workMode.value,
+      throws,
+      presets: presetList,
+      keydStems,
     })
-    for (const line of logLines) {
-      const type: LogEntry['type'] = line.startsWith('  ✓') ? 'success' : line.startsWith('⚠') ? 'warning' : 'info'
+
+    for (const line of result.logs) {
+      const type: LogEntry['type'] = line.startsWith('  ✓') ? 'success'
+        : line.includes('⚠') || line.startsWith('  ✗') ? 'warning'
+        : 'info'
       addLog(line, type)
     }
-    addLog('修改完成！', 'success')
+    if (result.success) {
+      addLog('修改完成！', 'success')
+    } else {
+      addLog(`修改失败: ${result.message}`, 'error')
+    }
   } catch (e) {
     addLog(`修改失败：${e}`, 'error')
   } finally {
@@ -253,31 +498,9 @@ async function handleModify() {
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
 .field-hint { font-size: 10px; color: var(--text-muted); padding-left: 2px; }
-/* Path */
-.path-group { display: flex; gap: 8px; }
-.path-display { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; min-width: 0; }
-.path-icon { flex-shrink: 0; color: var(--text-muted); }
-.path-text { font-size: 12px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.path-text.placeholder { color: var(--text-muted); }
-.browse-btn { flex-shrink: 0; padding: 10px 16px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); font-size: 12px; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
-.browse-btn:hover { background: var(--bg-elevated); border-color: var(--accent-purple); color: var(--accent-purple); }
-/* Key-length list */
-.key-length-list { display: flex; flex-direction: column; gap: 6px; }
-.kl-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; transition: all 0.15s; }
-.kl-row.active { border-color: rgba(183,108,241,0.3); background: rgba(183,108,241,0.03); }
-.kl-row.invalid { border-color: rgba(255,170,68,0.3); background: rgba(255,170,68,0.03); }
-.kl-check { display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 48px; flex: 1; min-width: 0; }
-.kl-check input { accent-color: var(--accent-purple); flex-shrink: 0; }
-.kl-label { font-size: 13px; font-weight: 500; color: var(--text-primary); flex-shrink: 0; }
-.kl-badge { font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(255,170,68,0.15); color: #ffaa44; flex-shrink: 0; }
-.kl-current { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
-.kl-2x { font-size: 10px; color: var(--accent-purple); opacity: 0.8; }
-.kl-input-wrap { display: flex; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
-.kl-input { width: 60px; padding: 5px 8px; background: transparent; border: none; color: var(--text-primary); font-size: 12px; font-family: 'JetBrains Mono', monospace; outline: none; text-align: right; }
-.kl-input::-webkit-inner-spin-button, .kl-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.kl-input { -moz-appearance: textfield; }
-.kl-suffix { padding: 0 8px; font-size: 10px; color: var(--text-muted); border-left: 1px solid var(--border-color); }
-.key-length-empty { font-size: 12px; color: var(--text-muted); padding: 12px; text-align: center; }
+/* Repair placeholder (shared by all 3 sections) */
+.repair-placeholder { display: flex; align-items: center; justify-content: center; min-height: 120px; padding: 24px; font-size: 13px; color: var(--text-muted); text-align: center; border: 1px dashed var(--border-color); border-radius: 8px; background: var(--bg-panel); }
+
 /* Radio */
 .radio-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .radio-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
@@ -290,6 +513,82 @@ async function handleModify() {
 .radio-content { display: flex; flex-direction: column; gap: 2px; }
 .radio-title { font-size: 12px; font-weight: 500; color: var(--text-primary); }
 .radio-desc { font-size: 10px; color: var(--text-muted); }
+
+/* Path */
+.path-group { display: flex; gap: 8px; }
+.path-display { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; min-width: 0; }
+.path-icon { flex-shrink: 0; color: var(--text-muted); }
+.path-text { font-size: 12px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.path-text.placeholder { color: var(--text-muted); }
+.browse-btn { flex-shrink: 0; padding: 10px 16px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); font-size: 12px; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
+.browse-btn:hover { background: var(--bg-elevated); border-color: var(--accent-purple); color: var(--accent-purple); }
+
+/* Key/KeyD grid (3 per row, scrollable) — SkinAdapter style */
+.repair-scroll { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 6px; background: var(--bg-panel); }
+.repair-scroll::-webkit-scrollbar { width: 4px; }
+.repair-scroll::-webkit-scrollbar-track { background: transparent; }
+.repair-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+.repair-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.repair-item { display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+.repair-item.active { border-color: rgba(183,108,241,0.3); background: rgba(183,108,241,0.03); }
+.repair-item input { accent-color: var(--accent-purple); margin: 0; width: 12px; height: 12px; flex-shrink: 0; }
+.ri-stem { font-size: 12px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.ri-tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; flex-shrink: 0; }
+.ri-key { background: rgba(100,255,160,0.15); color: #64ffa0; }
+.ri-keyd { background: rgba(255,170,68,0.15); color: #ffaa44; }
+
+/* Preset table (scrollable) */
+.preset-scroll { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 6px; background: var(--bg-panel); }
+.preset-scroll::-webkit-scrollbar { width: 4px; }
+.preset-scroll::-webkit-scrollbar-track { background: transparent; }
+.preset-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+.preset-table { display: flex; flex-direction: column; gap: 4px; }
+.preset-row { display: flex; align-items: center; gap: 8px; padding: 6px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; }
+.psr-stem { width: 120px; flex-shrink: 0; font-size: 11px; font-weight: 500; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.psr-usage { flex: 1; display: flex; flex-wrap: wrap; gap: 3px; }
+.ps-usage-item { font-size: 10px; color: var(--text-muted); background: var(--bg-surface); padding: 1px 5px; border-radius: 3px; }
+.psr-preset { width: 80px; flex-shrink: 0; }
+.preset-pick-btn { font-size: 10px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-family: inherit; }
+.preset-pick-btn:hover { border-color: var(--accent-purple); color: var(--accent-purple); }
+.preset-selected { display: flex; align-items: center; gap: 4px; cursor: pointer; position: relative; }
+.preset-thumb { width: 28px; height: 21px; object-fit: cover; border-radius: 3px; border: 1px solid var(--border-color); }
+.preset-name-sm { font-size: 9px; color: var(--text-secondary); max-width: 30px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preset-clear { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; border-radius: 50%; border: none; background: var(--bg-surface); color: var(--text-muted); font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+
+/* Throw grid (3 per row, scrollable) */
+.throw-scroll { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 6px; background: var(--bg-panel); }
+.throw-scroll::-webkit-scrollbar { width: 4px; }
+.throw-scroll::-webkit-scrollbar-track { background: transparent; }
+.throw-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+.throw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.throw-card { display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px; transition: all 0.15s; }
+.throw-card.active { border-color: rgba(183,108,241,0.4); background: rgba(183,108,241,0.04); }
+.throw-card.invalid { opacity: 0.5; }
+.tc-check { display: flex; align-items: center; gap: 3px; cursor: pointer; flex-shrink: 0; }
+.tc-check input { accent-color: var(--accent-purple); margin: 0; width: 12px; height: 12px; }
+.tc-keys { font-size: 12px; font-weight: 600; color: var(--text-primary); min-width: 28px; }
+.tc-input { flex: 1; min-width: 0; padding: 2px 4px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-primary); font-size: 10px; font-family: 'JetBrains Mono', monospace; outline: none; text-align: right; }
+.tc-input:disabled { color: var(--text-muted); opacity: 0.4; cursor: not-allowed; }
+.tc-input::-webkit-inner-spin-button, .tc-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.tc-input { -moz-appearance: textfield; }
+.tc-orig { font-size: 9px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; min-width: 52px; text-align: right; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; z-index: 30000; background: rgba(4,5,10,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
+.preset-modal { width: 640px; max-width: 92vw; max-height: 80vh; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.6); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+.modal-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.modal-close { width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: var(--bg-surface); color: var(--text-primary); }
+.modal-body { flex: 1; overflow-y: auto; padding: 14px; }
+.preset-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.preset-card { display: flex; flex-direction: column; background: var(--bg-elevated); border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: all 0.15s; overflow: hidden; }
+.preset-card:hover { border-color: rgba(183,108,241,0.3); box-shadow: 0 0 16px rgba(183,108,241,0.1); }
+.preset-card.active { border-color: var(--accent-purple); background: rgba(183,108,241,0.06); box-shadow: 0 0 12px rgba(183,108,241,0.2); }
+.preset-img-wrap { width: 100%; aspect-ratio: 3 / 4; overflow: hidden; background: #0a0b14; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; position: relative; }
+.preset-img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.preset-label { font-size: 11px; color: var(--text-primary); font-weight: 500; text-align: center; padding: 7px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Button */
 .btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 8px; border: none; font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; }
 .btn-full { width: 100%; }
@@ -297,6 +596,7 @@ async function handleModify() {
 .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 16px rgba(183,108,241,0.4); transform: translateY(-1px); }
 .btn-primary:active:not(:disabled) { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
 /* Log */
 .log-section { display: flex; flex-direction: column; gap: 8px; }
 .log-header { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }

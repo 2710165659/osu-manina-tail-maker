@@ -39,7 +39,14 @@ pub fn run() {
             repair_key_image_folder,
             repair_lazer_osk,
             get_skin_throw_info,
+            compute_lazer_throws,
+            compute_lazer_throw_single,
+            get_image_key_info,
+            get_keyd_list,
             modify_skin_throw_length,
+            get_tail_preview,
+            convert_tail_toolbox,
+            load_presets,
             validate_skin_files_cmd,
         ])
         .run(tauri::generate_context!())

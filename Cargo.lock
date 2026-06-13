@@ -3902,7 +3902,11 @@ dependencies = [
 name = "shared"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "image",
+ "png 0.17.16",
+ "serde",
+ "zip",
 ]
 
 [[package]]
@@ -4139,6 +4143,7 @@ dependencies = [
 name = "tail-maker-external"
 version = "0.1.0"
 dependencies = [
+ "image",
  "log",
  "serde",
  "serde_json",

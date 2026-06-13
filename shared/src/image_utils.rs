@@ -1,4 +1,6 @@
 /// 图像通用工具
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 
 use image::RgbaImage;
@@ -15,6 +17,128 @@ pub fn find_first_non_transparent_row(img: &RgbaImage) -> Option<u32> {
         }
     }
     None
+}
+
+/// 流式读取 PNG，从顶部逐行扫描，找到第一个不透明像素所在行号（0-based）。
+/// 只在找到非透明行之前解码必要的行，避免解码整张大图。
+/// 全透明返回 None。
+pub fn find_first_non_transparent_row_streaming(path: &Path) -> Result<Option<u32>, String> {
+    let file = File::open(path).map_err(|e| format!("打开文件失败: {}", e))?;
+    let decoder = png::Decoder::new(BufReader::new(file));
+    let mut reader = decoder
+        .read_info()
+        .map_err(|e| format!("读取 PNG 信息失败: {}", e))?;
+
+    let info = reader.info();
+    let color_type = info.color_type;
+    let has_alpha = matches!(
+        color_type,
+        png::ColorType::Rgba | png::ColorType::GrayscaleAlpha
+    );
+    let bpp = info.bytes_per_pixel();
+
+    let mut row = 0u32;
+
+    while let Some(row_data) = reader
+        .next_row()
+        .map_err(|e| format!("读取 PNG 行失败: {}", e))?
+    {
+        let data = row_data.data();
+        if has_alpha {
+            let alpha_offset = bpp - 1;
+            for x in (alpha_offset..data.len()).step_by(bpp) {
+                if data[x] > 0 {
+                    return Ok(Some(row));
+                }
+            }
+        } else if bpp >= 3 {
+            for chunk in data.chunks(bpp) {
+                if chunk[0] > 0 || chunk[1] > 0 || chunk[2] > 0 {
+                    return Ok(Some(row));
+                }
+            }
+        } else {
+            for &b in data {
+                if b > 0 {
+                    return Ok(Some(row));
+                }
+            }
+        }
+        row += 1;
+    }
+
+    Ok(None)
+}
+
+/// 流式读取 PNG 顶部 `max_rows` 行，返回 RgbaImage。
+/// 用于生成预览图，避免解码全部行。
+pub fn read_top_rows_streaming(path: &Path, max_rows: u32) -> Result<RgbaImage, String> {
+    let file = File::open(path).map_err(|e| format!("打开文件失败: {}", e))?;
+    let decoder = png::Decoder::new(BufReader::new(file));
+    let mut reader = decoder
+        .read_info()
+        .map_err(|e| format!("读取 PNG 信息失败: {}", e))?;
+
+    let info = reader.info();
+    let width = info.width;
+    let height = info.height;
+    let crop_h = height.min(max_rows);
+    let src_color = info.color_type;
+
+    // Check for indexed color early
+    if matches!(src_color, png::ColorType::Indexed) {
+        drop(reader);
+        let img = image::open(path)
+            .map_err(|e| format!("读取索引颜色 PNG 失败: {}", e))?
+            .to_rgba8();
+        let (w, h) = img.dimensions();
+        let crop_h = h.min(max_rows);
+        let mut cropped = RgbaImage::new(w, crop_h);
+        for y in 0..crop_h {
+            for x in 0..w {
+                cropped.put_pixel(x, y, *img.get_pixel(x, y));
+            }
+        }
+        return Ok(cropped);
+    }
+
+    let mut img = RgbaImage::new(width, crop_h);
+    let mut out_row = 0u32;
+
+    while out_row < crop_h {
+        match reader
+            .next_row()
+            .map_err(|e| format!("读取 PNG 行失败: {}", e))? {
+            Some(row_data) => {
+                let data = row_data.data();
+                for x in 0..width as usize {
+                    let pixel = match src_color {
+                        png::ColorType::Rgba => {
+                            let o = x * 4;
+                            image::Rgba([data[o], data[o + 1], data[o + 2], data[o + 3]])
+                        }
+                        png::ColorType::Rgb => {
+                            let o = x * 3;
+                            image::Rgba([data[o], data[o + 1], data[o + 2], 255])
+                        }
+                        png::ColorType::GrayscaleAlpha => {
+                            let o = x * 2;
+                            image::Rgba([data[o], data[o], data[o], data[o + 1]])
+                        }
+                        png::ColorType::Grayscale => {
+                            image::Rgba([data[x], data[x], data[x], 255])
+                        }
+                        png::ColorType::Indexed => unreachable!(),
+                    };
+                    img.put_pixel(x as u32, out_row, pixel);
+                }
+                out_row += 1;
+            }
+            None => break,
+        }
+    }
+
+    Ok(img)
 }
 
 /// 找到图片中不透明主体元素的包围矩形 (left, top, right, bottom)，右下排他。

@@ -599,3 +599,68 @@ body::before {
 .log-line.error .log-msg {
   color: var(--error);
 }
+
+/* ---------- Radio Cards (mode selection) ---------- */
+.radio-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.radio-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
+.radio-card:hover { border-color: rgba(183,108,241,0.3); background: rgba(183,108,241,0.03); }
+.radio-card.active { border-color: var(--accent-purple); background: rgba(183,108,241,0.06); }
+.radio-dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border-color); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; transition: all 0.2s ease; }
+.radio-card.active .radio-dot { border-color: var(--accent-purple); }
+.radio-dot-inner { width: 8px; height: 8px; border-radius: 50%; background: transparent; transition: all 0.2s ease; }
+.radio-card.active .radio-dot-inner { background: var(--accent-purple); }
+.radio-content { display: flex; flex-direction: column; gap: 2px; }
+.radio-title { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+.radio-desc { font-size: 10px; color: var(--text-muted); }
+
+/* ---------- Key/KeyD list ---------- */
+.keyd-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; transition: all 0.15s; }
+.keyd-row.active { border-color: rgba(183,108,241,0.3); background: rgba(183,108,241,0.03); }
+.kdr-check { display: flex; align-items: center; gap: 4px; cursor: pointer; width: 130px; flex-shrink: 0; }
+.kdr-check input { accent-color: var(--accent-purple); flex-shrink: 0; }
+.kdr-stem { font-size: 11px; font-weight: 500; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kdr-usage { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+.kd-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; }
+.kd-key { background: rgba(100,200,255,0.12); color: #64c8ff; }
+.kd-keyd { background: rgba(255,170,68,0.12); color: #ffaa44; }
+
+/* ---------- Preset per-stem list ---------- */
+#preset-stem-list { display: flex; flex-direction: column; gap: 4px; }
+.preset-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; }
+.psr-stem { width: 120px; flex-shrink: 0; font-size: 11px; font-weight: 500; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.psr-usage { flex: 1; display: flex; flex-wrap: wrap; gap: 3px; }
+.ps-usage-item { font-size: 10px; color: var(--text-muted); background: var(--bg-surface); padding: 1px 5px; border-radius: 3px; }
+.psr-preset { width: 90px; flex-shrink: 0; }
+.preset-pick-btn { font-size: 10px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-family: inherit; }
+.preset-pick-btn:hover { border-color: var(--accent-purple); color: var(--accent-purple); }
+.preset-selected { display: flex; align-items: center; gap: 4px; cursor: pointer; position: relative; }
+.preset-thumb { width: 28px; height: 21px; object-fit: cover; border-radius: 3px; border: 1px solid var(--border-color); }
+.preset-name-sm { font-size: 9px; color: var(--text-secondary); max-width: 35px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preset-clear { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; border-radius: 50%; border: none; background: var(--bg-surface); color: var(--text-muted); font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+
+/* ---------- Preset picker overlay ---------- */
+.preset-picker-overlay { position: fixed; inset: 0; z-index: 30000; background: rgba(4,5,10,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
+.preset-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; max-width: 400px; max-height: 60vh; overflow-y: auto; padding: 16px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 32px 80px rgba(0,0,0,0.6); }
+.preset-picker-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+.preset-picker-card:hover { border-color: rgba(183,108,241,0.3); background: rgba(183,108,241,0.03); }
+.preset-picker-card.active { border-color: var(--accent-purple); background: rgba(183,108,241,0.08); }
+.preset-picker-img-wrap { width: 100%; height: 40px; overflow: hidden; border-radius: 4px; background: var(--bg-input); }
+.preset-picker-img { width: 100%; height: 100%; object-fit: cover; }
+.preset-picker-label { font-size: 10px; color: var(--text-muted); text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Throw keys list ---------- */
+#keys-throw-list { display: flex; flex-direction: column; gap: 4px; }
+.key-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; transition: all 0.15s; }
+.key-row.active { border-color: rgba(183,108,241,0.3); background: rgba(183,108,241,0.03); }
+.key-row.invalid { border-color: rgba(255,170,68,0.3); background: rgba(255,170,68,0.03); }
+.kr-check { display: flex; align-items: center; gap: 4px; cursor: pointer; width: 65px; flex-shrink: 0; }
+.kr-check input { accent-color: var(--accent-purple); flex-shrink: 0; }
+.kr-keys { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+.kr-current { flex: 1; font-size: 11px; color: var(--text-secondary); }
+.badge-invalid { font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(255,170,68,0.15); color: #ffaa44; }
+.kr-target { width: 90px; flex-shrink: 0; }
+.target-input-wrap { display: flex; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; }
+.target-input { width: 55px; padding: 4px 6px; background: transparent; border: none; color: var(--text-primary); font-size: 11px; font-family: 'JetBrains Mono', monospace; outline: none; text-align: right; }
+.target-input::-webkit-inner-spin-button, .target-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.target-suffix { padding: 0 6px; font-size: 9px; color: var(--text-muted); border-left: 1px solid var(--border-color); }
+.kr-na { font-size: 11px; color: var(--text-muted); }

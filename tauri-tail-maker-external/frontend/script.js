@@ -1,265 +1,355 @@
 /**
  * osu!mania Tail Maker External Tool - Script
  */
-
 const { invoke } = window.__TAURI__.core;
 
 // ============================================
 // State
 // ============================================
 const state = {
+  mode: 'lazer',
   presets: [],
   keys: [],
-  selectedPreset: null,
-  selectedKeys: new Set(),
+  keydInfos: [],       // { stem, as_key: [], as_keyd: [] }
+  imageKeyInfos: [],   // { stem, image_path, used_by: [{keys, columns}] }
+  skinThrowInfos: [],  // { keys, current_throw, lazer_throw, valid, ... }
+  keydChecked: new Set(),
+  stemPresets: {},
+  throwMap: {},         // keys → target throw
   skinRoot: null,
   initialized: false,
 };
 
 // ============================================
-// DOM Elements
+// DOM
 // ============================================
 const $ = (id) => document.getElementById(id);
-const presetSection = $("preset-section");
-const presetGrid = $("preset-grid");
-const keyGrid = $("key-grid");
-const throwLengthInput = $("throw-length");
-const convertBtn = $("convert-btn");
-const logContent = $("log-content");
-const githubLink = $("github-link");
 
 // ============================================
-// Log System
+// Log
 // ============================================
 function addLog(message, type = "info") {
+  const logContent = $("log-content");
   const empty = logContent.querySelector(".log-empty");
   if (empty) empty.remove();
-
   const now = new Date();
   const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-
   const line = document.createElement("div");
   line.className = `log-line ${type}`;
-  line.innerHTML = `
-    <span class="log-time">${time}</span>
-    <span class="log-marker">›</span>
-    <span class="log-msg">${message}</span>
-  `;
-
+  line.innerHTML = `<span class="log-time">${time}</span><span class="log-marker">›</span><span class="log-msg">${message}</span>`;
   logContent.appendChild(line);
   logContent.scrollTop = logContent.scrollHeight;
 }
 
 // ============================================
-// Preset Rendering
+// Helpers
 // ============================================
-function renderPresets() {
-  if (state.presets.length === 0) {
-    presetSection.classList.add("hidden");
-    return;
-  }
+function getModeThrow(info) {
+  return state.mode === 'lazer' ? info.lazer_throw : info.current_throw;
+}
 
-  presetSection.classList.remove("hidden");
-  presetGrid.innerHTML = "";
-
-  state.presets.forEach((preset) => {
-    const card = document.createElement("div");
-    card.className = `preset-card${state.selectedPreset === preset.name ? " active" : ""}`;
-    card.dataset.name = preset.name;
-    card.innerHTML = `
-      <div class="preset-radio">
-        <div class="preset-radio-inner"></div>
-      </div>
-      <div class="preset-image-wrap">
-        <img class="preset-image" src="asset://localhost/${encodeURIComponent(preset.image_path)}" alt="${preset.name}" loading="lazy" />
-      </div>
-      <span class="preset-name" title="${preset.name}">${preset.name}</span>
-    `;
-
-    card.addEventListener("click", () => {
-      if (state.selectedPreset === preset.name) {
-        state.selectedPreset = null;
-      } else {
-        state.selectedPreset = preset.name;
-      }
-      renderPresets();
+// ============================================
+// Mode radios
+// ============================================
+function setupModeRadios() {
+  document.querySelectorAll('#mode-radios .radio-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('#mode-radios .radio-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      state.mode = card.dataset.mode;
+      renderKeydSection();
+      renderThrowKeys();
     });
-
-    presetGrid.appendChild(card);
   });
 }
 
 // ============================================
-// Key Rendering
+// Key/KeyD section
 // ============================================
-function renderKeys() {
-  keyGrid.innerHTML = "";
+function renderKeydSection() {
+  const section = $('keyd-section');
+  if (state.mode !== 'lazer' || state.keydInfos.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
 
+  const list = $('keyd-list');
+  list.innerHTML = '';
+  state.keydInfos.forEach(kd => {
+    const row = document.createElement('div');
+    row.className = `keyd-row${state.keydChecked.has(kd.stem) ? ' active' : ''}`;
+    const tags = [];
+    if (kd.as_key.length > 0) tags.push(`<span class="kd-tag kd-key">Key: ${kd.as_key.map(k => k + 'k').join(', ')}</span>`);
+    if (kd.as_keyd.length > 0) tags.push(`<span class="kd-tag kd-keyd">KeyD: ${kd.as_keyd.map(k => k + 'k').join(', ')}</span>`);
+    row.innerHTML = `
+      <label class="kdr-check">
+        <input type="checkbox" ${state.keydChecked.has(kd.stem) ? 'checked' : ''} />
+        <span class="kdr-stem">${kd.stem}</span>
+      </label>
+      <div class="kdr-usage">${tags.join(' ')}</div>
+    `;
+    row.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) state.keydChecked.add(kd.stem);
+      else state.keydChecked.delete(kd.stem);
+      row.classList.toggle('active', e.target.checked);
+    });
+    list.appendChild(row);
+  });
+}
+
+// ============================================
+// Preset section (by stem)
+// ============================================
+function renderPresetSection() {
+  const section = $('preset-section');
+  if (state.presets.length === 0 || state.imageKeyInfos.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  const list = $('preset-stem-list');
+  list.innerHTML = '';
+  state.imageKeyInfos.forEach(ik => {
+    const row = document.createElement('div');
+    row.className = 'preset-row';
+    const usage = ik.used_by.map(u => `<span class="ps-usage-item">${u.keys}k (列${u.columns.join(',')})</span>`).join(' ');
+    const preset = state.stemPresets[ik.stem];
+    row.innerHTML = `
+      <span class="psr-stem" title="${ik.image_path}">${ik.stem}</span>
+      <div class="psr-usage">${usage}</div>
+      <div class="psr-preset">
+        ${preset ? `<div class="preset-selected" data-stem="${ik.stem}">
+          <img src="asset://localhost/${encodeURIComponent(preset.image_path)}" class="preset-thumb" />
+          <span class="preset-name-sm">${preset.name}</span>
+          <button class="preset-clear" data-stem="${ik.stem}">×</button>
+        </div>` : `<button class="preset-pick-btn" data-stem="${ik.stem}">选择预设</button>`}
+      </div>
+    `;
+    // Click preset picker
+    row.querySelector('.preset-pick-btn')?.addEventListener('click', () => openPresetPicker(ik.stem));
+    row.querySelector('.preset-selected')?.addEventListener('click', () => openPresetPicker(ik.stem));
+    row.querySelector('.preset-clear')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      delete state.stemPresets[ik.stem];
+      renderPresetSection();
+    });
+    list.appendChild(row);
+  });
+}
+
+// ============================================
+// Preset picker (simple dropdown-like inline modal)
+// ============================================
+let currentPresetStem = null;
+
+function openPresetPicker(stem) {
+  currentPresetStem = stem;
+  // Build grid overlay
+  const existing = document.querySelector('.preset-picker-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'preset-picker-overlay';
+  const grid = document.createElement('div');
+  grid.className = 'preset-picker-grid';
+  state.presets.forEach(p => {
+    const card = document.createElement('div');
+    card.className = `preset-picker-card${state.stemPresets[stem]?.name === p.name ? ' active' : ''}`;
+    card.innerHTML = `
+      <div class="preset-picker-img-wrap"><img src="asset://localhost/${encodeURIComponent(p.image_path)}" class="preset-picker-img" /></div>
+      <span class="preset-picker-label">${p.name}</span>
+    `;
+    card.addEventListener('click', () => {
+      state.stemPresets[stem] = p;
+      addLog(`${stem} 选择预设: ${p.name}`, 'info');
+      overlay.remove();
+      renderPresetSection();
+    });
+    grid.appendChild(card);
+  });
+  overlay.appendChild(grid);
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// ============================================
+// Throw keys section
+// ============================================
+function renderThrowKeys() {
+  const list = $('keys-throw-list');
   if (state.keys.length === 0) {
-    keyGrid.innerHTML =
-      '<span style="color: var(--text-muted); font-size: 12px;">未找到键数配置</span>';
+    list.innerHTML = '<span style="color: var(--text-muted); font-size: 12px;">未找到键数配置</span>';
     return;
   }
 
-  state.keys.forEach((key) => {
-    const label = `${key}k`;
-    const card = document.createElement("div");
-    card.className = `key-card${state.selectedKeys.has(key) ? " active" : ""}`;
-    card.dataset.key = key;
-    card.innerHTML = `
-      <div class="checkbox-box">
-        ${state.selectedKeys.has(key) ? '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ""}
+  list.innerHTML = '';
+  state.keys.forEach(key => {
+    const info = state.skinThrowInfos.find(s => s.keys === key);
+    if (!info) return;
+    const row = document.createElement('div');
+    row.className = `key-row${state.throwMap[key] !== undefined ? ' active' : ''}${!info.valid ? ' invalid' : ''}`;
+    const checked = state.throwMap[key] !== undefined;
+    const val = state.throwMap[key] ?? getModeThrow(info);
+    row.innerHTML = `
+      <label class="kr-check">
+        <input type="checkbox" ${checked ? 'checked' : ''} ${!info.valid ? 'disabled' : ''} />
+        <span class="kr-keys">${key}k</span>
+      </label>
+      <div class="kr-current">
+        ${!info.valid ? '<span class="badge-invalid">不合规</span>' : `<span>${getModeThrow(info)}px</span>`}
       </div>
-      <span class="key-label">${label}</span>
+      <div class="kr-target">
+        ${checked && info.valid ? `<div class="target-input-wrap"><input type="number" class="target-input" value="${val}" min="1" /><span class="target-suffix">px</span></div>` : '<span class="kr-na">-</span>'}
+      </div>
     `;
-
-    card.addEventListener("click", () => {
-      if (state.selectedKeys.has(key)) {
-        state.selectedKeys.delete(key);
+    const cb = row.querySelector('input[type=checkbox]');
+    cb.addEventListener('change', () => {
+      if (cb.checked) {
+        state.throwMap[key] = getModeThrow(info);
       } else {
-        state.selectedKeys.add(key);
+        delete state.throwMap[key];
       }
-      renderKeys();
+      renderThrowKeys();
     });
-
-    keyGrid.appendChild(card);
+    const input = row.querySelector('.target-input');
+    if (input) {
+      input.addEventListener('input', () => {
+        const v = parseInt(input.value, 10);
+        if (v > 0) state.throwMap[key] = v;
+      });
+    }
+    list.appendChild(row);
   });
+  updateConvertBtn();
 }
 
 // ============================================
-// Update Convert Button State
+// Convert
 // ============================================
 function updateConvertBtn() {
-  const hasSkin = state.skinRoot !== null;
-  const hasKeys = state.selectedKeys.size > 0;
-  const length = parseInt(throwLengthInput.value, 10);
-  const hasLength = length > 0;
-
-  convertBtn.disabled = !(hasSkin && hasKeys && hasLength);
+  const btn = $('convert-btn');
+  btn.disabled = !(state.skinRoot && Object.keys(state.throwMap).length > 0);
 }
 
-// ============================================
-// Convert Action
-// ============================================
 async function handleConvert() {
-  if (convertBtn.disabled) return;
+  if ($('convert-btn').disabled) return;
 
-  const length = parseInt(throwLengthInput.value, 10);
-  const selectedKeysArr = Array.from(state.selectedKeys).sort((a, b) => a - b);
+  addLog('开始转换任务...', 'info');
+  addLog(`模式: ${state.mode}`, 'info');
 
-  addLog("开始转换任务...", "info");
-
-  if (state.selectedPreset) {
-    addLog(`使用预设: ${state.selectedPreset}`, "info");
-  }
-
-  addLog(`目标键数: ${selectedKeysArr.map((k) => k + "k").join(", ")}`, "info");
-  addLog(`投长度: ${length}px`, "info");
+  const throws = Object.entries(state.throwMap).map(([k, v]) => [parseInt(k), v]);
+  const presets = Object.entries(state.stemPresets).filter(([, v]) => v != null).map(([stem, v]) => [stem, v.name]);
+  const keydStems = [...state.keydChecked];
 
   try {
-    const result = await invoke("convert_tail", {
+    const result = await invoke('convert_tail', {
       config: {
         skin_root: state.skinRoot,
-        keys: selectedKeysArr,
-        throw_length: length,
-        preset: state.selectedPreset,
+        mode: state.mode,
+        throws,
+        presets,
+        keyd_stems: keydStems,
       },
     });
-
-    if (result.success) {
-      addLog(result.message, "success");
-      result.processed_keys.forEach((key) => {
-        addLog(`✓ ${key}k 转换完成`, "success");
-      });
-    } else {
-      addLog(result.message, "error");
+    for (const line of result.logs) {
+      const type = line.startsWith('  ✓') ? 'success' : line.includes('⚠') || line.startsWith('  ✗') ? 'warning' : 'info';
+      addLog(line, type);
     }
+    addLog(result.message, result.success ? 'success' : 'error');
   } catch (e) {
-    addLog(`转换失败: ${e}`, "error");
+    addLog(`转换失败: ${e}`, 'error');
   }
 }
 
 // ============================================
-// Event Listeners
-// ============================================
-convertBtn.addEventListener("click", handleConvert);
-
-throwLengthInput.addEventListener("input", updateConvertBtn);
-throwLengthInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    handleConvert();
-  }
-});
-
-// GitHub 链接 — 用默认浏览器打开
-if (githubLink) {
-  githubLink.addEventListener("click", () => {
-    invoke("open_url", { url: "https://github.com/2710165659/osu-manina-tail-maker" });
-  });
-}
-
-// ============================================
-// Find Skin Root
-// ============================================
-async function findSkinRoot() {
-  try {
-    const result = await invoke("find_skin_root");
-    if (result.success) {
-      return result.path;
-    }
-    addLog(result.message, "warning");
-    return null;
-  } catch (e) {
-    addLog(`查找皮肤目录失败: ${e}`, "error");
-    return null;
-  }
-}
-
-// ============================================
-// Init - 页面加载时自动初始化
+// Init
 // ============================================
 async function init() {
-  addLog("正在初始化...", "info");
+  addLog('正在初始化...', 'info');
+  setupModeRadios();
+  $('convert-btn').addEventListener('click', handleConvert);
+
+  // GitHub link
+  const githubLink = $('github-link');
+  if (githubLink) {
+    githubLink.addEventListener('click', () => {
+      invoke('open_url', { url: 'https://github.com/2710165659/osu-manina-tail-maker' });
+    });
+  }
 
   try {
-    // 1. 寻找皮肤根目录
-    const skinRoot = await findSkinRoot();
-
-    if (!skinRoot) {
-      addLog("未找到皮肤根目录（skin.ini）", "error");
-      addLog("请将程序放在皮肤目录附近或手动选择", "warning");
-      convertBtn.disabled = true;
+    // 1. Find skin root
+    const skinResult = await invoke('find_skin_root');
+    if (!skinResult.success) {
+      addLog(skinResult.message, 'error');
+      addLog('请将程序放在皮肤目录附近', 'warning');
+      $('convert-btn').disabled = true;
       return;
     }
+    state.skinRoot = skinResult.path;
+    addLog(`找到皮肤目录: ${state.skinRoot}`, 'success');
 
-    state.skinRoot = skinRoot;
-    addLog(`找到皮肤目录: ${skinRoot}`, "success");
-
-    // 2. 查找键数
-    const keyResult = await invoke("find_keys", { skinRoot });
+    // 2. Find keys
+    const keyResult = await invoke('find_keys', { skinRoot: state.skinRoot });
     if (keyResult.success) {
       state.keys = keyResult.keys;
-      renderKeys();
-      addLog(keyResult.message, "info");
+      addLog(keyResult.message, 'info');
     } else {
-      addLog(keyResult.message, "error");
+      addLog(keyResult.message, 'error');
     }
 
-    // 3. 加载预设
-    const presets = await invoke("load_presets", { skinRoot });
-    state.presets = presets;
-    renderPresets();
-    if (presets.length > 0) {
-      addLog(`已加载 ${presets.length} 个预设`, "info");
+    // 3. Load throw info
+    addLog('正在读取皮肤信息...', 'info');
+    state.skinThrowInfos = await invoke('get_skin_throw_info', { skinRoot: state.skinRoot });
+    addLog('皮肤信息读取完成', 'success');
+
+    // Lazy compute lazer throws if in lazer mode
+    if (state.mode === 'lazer') {
+      const validStems = state.skinThrowInfos.filter(s => s.valid).map(s => s.stem);
+      if (validStems.length > 0) {
+        try {
+          addLog('正在计算 Lazer 投长度...', 'info');
+          const lazerResults = await invoke('compute_lazer_throws', { skinRoot: state.skinRoot, stems: validStems });
+          for (const [stem, lt] of lazerResults) {
+            const s = state.skinThrowInfos.find(i => i.stem === stem);
+            if (s) s.lazer_throw = lt;
+          }
+          addLog('Lazer 投长度计算完成', 'success');
+        } catch (e) {
+          addLog(`Lazer 投长度计算失败: ${e}`, 'warning');
+        }
+      }
     }
+
+    // 4. Load image-key info
+    try {
+      state.imageKeyInfos = await invoke('get_image_key_info', { skinRoot: state.skinRoot });
+    } catch (_) {}
+    // 5. Load Key/KeyD info
+    try {
+      state.keydInfos = await invoke('get_keyd_list', { skinRoot: state.skinRoot });
+      state.keydInfos.forEach(kd => state.keydChecked.add(kd.stem));
+    } catch (_) {}
+    // 6. Load presets
+    addLog('正在加载预设...', 'info');
+    try {
+      state.presets = await invoke('load_presets');
+      addLog(`已加载 ${state.presets.length} 个预设`, 'info');
+    } catch (_) {}
+
+    // Render sections
+    renderKeydSection();
+    renderPresetSection();
+    renderThrowKeys();
 
     state.initialized = true;
     updateConvertBtn();
   } catch (e) {
-    addLog(`初始化失败: ${e}`, "error");
-    convertBtn.disabled = true;
+    addLog(`初始化失败: ${e}`, 'error');
+    $('convert-btn').disabled = true;
   }
 }
 
-// 页面加载完成后初始化
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener('DOMContentLoaded', init);

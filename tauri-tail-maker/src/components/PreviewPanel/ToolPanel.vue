@@ -72,7 +72,7 @@ const tabs = [
   },
   {
     id: 'oneClickLength',
-    label: '一键修改投长度',
+    label: '一键修改面尾',
   },
   {
     id: 'batchGenerate',
