@@ -11,15 +11,13 @@
       <div class="field">
         <label class="field-label">预设选择</label>
         <div class="preset-grid">
-          <label
-            v-for="preset in presets"
-            :key="preset.name"
+          <label v-for="preset in presets" :key="preset.name"
             :class="['preset-card', { active: selectedPresetNames.has(preset.name) }]"
-            @click="togglePreset(preset.name)"
-          >
+            @click="togglePreset(preset.name)">
             <div class="checkbox-box">
               <svg v-if="selectedPresetNames.has(preset.name)" width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                  stroke-linejoin="round" />
               </svg>
             </div>
             <div class="preset-info">
@@ -58,7 +56,8 @@
           </div>
         </div>
         <span class="field-hint">
-          每个预设生成 {{ generatedCount }} 张（{{ startLength }}px ~ {{ effectiveEndLength }}px），共 {{ generatedCount * selectedPresetNames.size }} 张
+          每个预设生成 {{ generatedCount }} 张（{{ startLength }}px ~ {{ effectiveEndLength }}px），共 {{ generatedCount *
+            selectedPresetNames.size }} 张
         </span>
       </div>
 
