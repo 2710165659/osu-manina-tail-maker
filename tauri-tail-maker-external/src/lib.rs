@@ -3,10 +3,22 @@ mod key_finder;
 mod preset_loader;
 mod skin_finder;
 
+use tauri_plugin_dialog::DialogExt;
+
 /// 用默认浏览器打开 URL（包装 shared 库）
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     shared::open_url(&url)
+}
+
+/// 打开文件夹选择对话框，返回所选路径
+#[tauri::command]
+async fn browse_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let path = app
+        .dialog()
+        .file()
+        .blocking_pick_folder();
+    Ok(path.map(|p| p.to_string()))
 }
 
 /// 获取投长度信息 — thin wrapper
@@ -43,6 +55,7 @@ async fn get_tail_preview(skin_root: String, stem: String) -> Result<String, Str
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             converter::convert_tail,
             key_finder::find_keys,
@@ -54,6 +67,7 @@ pub fn run() {
             get_keyd_list,
             get_tail_preview,
             open_url,
+            browse_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2,7 +2,7 @@
   <div class="add-script">
     <!-- 描述卡片 -->
     <div class="desc-card">
-      <p class="desc-text">为皮肤添加一个独立脚本程序，放在皮肤根目录的 <code>scripts</code> 文件夹下。双击脚本即可快速切换投掷长度或使用其他预设，免去手动替换文件的麻烦。</p>
+      <p class="desc-text">为皮肤添加一个独立的“一键修改面尾”程序，放在皮肤根目录的 <code>scripts</code> 文件夹下。双击程序即可快速切换投长度或使用其他预设，免去手动替换文件的麻烦。</p>
     </div>
 
     <!-- 配置区域 -->
@@ -54,9 +54,9 @@
         <span class="field-hint">可选，选择要写入脚本的预设，脚本运行时可从这些预设中切换</span>
       </div>
 
-      <!-- 文件路径 -->
+      <!-- 皮肤文件夹 -->
       <div class="field">
-        <label class="field-label">文件路径</label>
+        <label class="field-label">皮肤文件夹</label>
         <div class="path-group">
           <div class="path-display">
             <svg class="path-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">

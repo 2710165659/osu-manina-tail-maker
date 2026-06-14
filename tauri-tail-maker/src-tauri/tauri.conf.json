@@ -37,7 +37,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "../../tauri-tail-maker-external/target/release/tail-maker-external.exe"
+      "../../target/release/tail-maker-external.exe"
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"

@@ -11,8 +11,8 @@
       {
         "title": "osu!mania Tail Maker - 外部工具",
         "width": 720,
-        "height": 700,
-        "resizable": true,
+        "height": 780,
+        "resizable": false,
         "fullscreen": false,
         "center": true
       }

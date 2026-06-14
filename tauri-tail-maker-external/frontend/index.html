@@ -33,66 +33,98 @@
       </header>
 
       <main class="panel-body">
-        <div class="desc-card">
-          <p class="desc-text">
-            一键修改 osu!mania 皮肤面尾投的长度，切换预设样式。此操作会将原始文件备份到 _backup 文件夹。
-          </p>
-        </div>
+        <div class="one-click-length">
+          <!-- Description -->
+          <div class="desc-card">
+            <p class="desc-text">一键修改面尾。为不同键数设定目标投长度，可选预设替换面尾图片、修复 Key/KeyD 拉伸。此操作会将原始文件备份到皮肤根目录下的 _backup 文件夹。</p>
+          </div>
 
-        <div class="config-group">
-          <!-- 模式选择 -->
-          <div class="field">
-            <label class="field-label">修复模式</label>
-            <div class="radio-cards" id="mode-radios">
-              <label class="radio-card active" data-mode="lazer">
-                <div class="radio-dot"><div class="radio-dot-inner"></div></div>
-                <div class="radio-content">
-                  <span class="radio-title">Lazer</span>
-                  <span class="radio-desc">拉伸到 ColumnWidth×1.6 32800。</span>
+          <div class="config-group">
+            <!-- 修复模式 -->
+            <div class="field">
+              <label class="field-label">修复模式</label>
+              <div class="radio-cards" id="mode-radios">
+                <label class="radio-card active" data-mode="lazer">
+                  <div class="radio-dot"><div class="radio-dot-inner"></div></div>
+                  <div class="radio-content">
+                    <span class="radio-title">Lazer</span>
+                    <span class="radio-desc">修改投长度后拉伸到 ColumnWidth×1.6 32800。</span>
+                  </div>
+                </label>
+                <label class="radio-card" data-mode="stable">
+                  <div class="radio-dot"><div class="radio-dot-inner"></div></div>
+                  <div class="radio-content">
+                    <span class="radio-title">Stable</span>
+                    <span class="radio-desc">仅修改投长度，不拉伸图片。</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 皮肤文件夹路径 -->
+            <div class="field">
+              <label class="field-label">皮肤文件夹</label>
+              <div class="path-group">
+                <div class="path-display">
+                  <svg class="path-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M1.5 7.5v3.5a1 1 0 001 1h9a1 1 0 001-1V7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+                    <path d="M7 1.5v6M4.5 5L7 7.5 9.5 5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span class="path-text placeholder" id="path-text">请选择皮肤所在文件夹</span>
                 </div>
-              </label>
-              <label class="radio-card" data-mode="stable">
-                <div class="radio-dot"><div class="radio-dot-inner"></div></div>
-                <div class="radio-content">
-                  <span class="radio-title">Stable</span>
-                  <span class="radio-desc">仅修改投长度。</span>
-                </div>
-              </label>
+                <button class="browse-btn" id="browse-btn"><span>浏览</span></button>
+              </div>
+            </div>
+
+            <!-- ===== 区块 A: Key/KeyD 修复列表（仅 Lazer） ===== -->
+            <div class="field" id="keyd-section">
+              <label class="field-label" id="keyd-label">Key/KeyD 修复</label>
+              <span class="field-hint hidden" id="keyd-count-hint"></span>
+              <div id="keyd-scroll" class="repair-scroll hidden">
+                <div class="repair-grid" id="keyd-grid"></div>
+              </div>
+              <span class="field-hint hidden" id="keyd-hint-bottom">勾选需要修复的 Key/KeyD 图片。</span>
+              <div class="repair-placeholder hidden" id="keyd-loading">正在加载...</div>
+              <div class="repair-placeholder hidden" id="keyd-empty">未找到 Key/KeyD 图片</div>
+              <div class="repair-placeholder" id="keyd-no-path">请先选择皮肤文件夹路径</div>
+            </div>
+
+            <!-- ===== 区块 B: 预设替换 ===== -->
+            <div class="field" id="preset-section">
+              <label class="field-label" id="preset-label">预设替换</label>
+              <span class="field-hint hidden" id="preset-count-hint"></span>
+              <div id="preset-scroll" class="preset-scroll hidden">
+                <div class="preset-table" id="preset-table"></div>
+              </div>
+              <span class="field-hint hidden" id="preset-hint-bottom">为每张面尾图片选择预设替换。同一 stem 被多个键数共享时只需选一次。</span>
+              <div class="repair-placeholder hidden" id="preset-loading">正在加载...</div>
+              <div class="repair-placeholder hidden" id="preset-empty">未找到面尾图片</div>
+              <div class="repair-placeholder" id="preset-no-path">请先选择皮肤文件夹路径</div>
+            </div>
+
+            <!-- ===== 区块 C: 修改投长度 ===== -->
+            <div class="field">
+              <label class="field-label" id="throw-label">修改投长度</label>
+              <span class="field-hint hidden" id="throw-count-hint"></span>
+              <span class="field-hint hidden" id="throw-computing"> — 正在计算投长度...</span>
+              <div id="throw-scroll" class="throw-scroll hidden">
+                <div class="throw-grid" id="throw-grid"></div>
+              </div>
+              <span class="field-hint hidden" id="throw-hint-bottom">勾选键数并输入目标投长度。</span>
+              <div class="repair-placeholder hidden" id="throw-loading">正在加载...</div>
+              <div class="repair-placeholder hidden" id="throw-empty">未检测到 NoteImage#L 面尾定义</div>
+              <div class="repair-placeholder" id="throw-no-path">请先选择皮肤文件夹路径</div>
+            </div>
+
+            <div class="field">
+              <button class="btn btn-primary btn-full" id="modify-btn" disabled>
+                <span id="modify-btn-text">开始修改</span>
+              </button>
             </div>
           </div>
-
-          <!-- Key/KeyD 修复列表（仅 Lazer） -->
-          <div class="field hidden" id="keyd-section">
-            <label class="field-label">Key/KeyD 修复</label>
-            <div id="keyd-list"></div>
-            <span class="field-hint">勾选需要修复的 Key/KeyD 图片。仅在 Lazer 模式下生效。</span>
-          </div>
-
-          <!-- 预设替换（按 stem） -->
-          <div class="field hidden" id="preset-section">
-            <label class="field-label">用预设替换现有图片</label>
-            <div id="preset-stem-list"></div>
-            <span class="field-hint">为每个面尾图片选择预设替换。</span>
-          </div>
-
-          <!-- 键数 + 投长度 -->
-          <div class="field">
-            <label class="field-label">修改投长度</label>
-            <div id="keys-throw-list"></div>
-            <span class="field-hint">勾选键数并输入目标投长度。</span>
-          </div>
-
-          <!-- 执行 -->
-          <div class="field">
-            <button type="button" class="btn btn-primary btn-full" id="convert-btn">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              <span>转换</span>
-            </button>
-          </div>
         </div>
 
+        <!-- 日志 -->
         <div class="log-section">
           <div class="log-header">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -102,14 +134,25 @@
             <span>日志</span>
           </div>
           <div class="log-content" id="log-content">
-            <div class="log-empty">
-              <span class="log-empty-icon">~</span>
-              <span>等待操作...</span>
-            </div>
+            <div class="log-empty"><span class="log-empty-icon">~</span><span>等待操作...</span></div>
           </div>
         </div>
       </main>
     </div>
+
+    <!-- 预设选择对话框 -->
+    <div class="modal-overlay hidden" id="preset-modal-overlay">
+      <div class="preset-modal">
+        <div class="modal-header">
+          <span class="modal-title" id="preset-modal-title">选择预设</span>
+          <button class="modal-close" id="preset-modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="preset-grid" id="preset-modal-grid"></div>
+        </div>
+      </div>
+    </div>
+
     <script src="script.js"></script>
   </body>
 </html>

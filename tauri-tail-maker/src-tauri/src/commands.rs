@@ -262,29 +262,30 @@ pub async fn get_image_preview_top(image_path: String) -> Result<String, String>
 
 /// 获取外部工具 exe 的路径
 /// 开发模式下返回 tauri-tail-maker-external/target/release/tail-maker-external.exe
+/// （release 不存在时 fallback 到 debug）
 /// 打包模式下返回资源目录中的 tail-maker-external.exe
 #[tauri::command]
 pub fn get_external_tool_path(app: tauri::AppHandle) -> Result<String, String> {
     // 开发模式：从项目目录获取
-    // 当前目录为 src-tauri/，上两级到项目根目录，再进入 tauri-tail-maker-external/
     if cfg!(debug_assertions) {
+        // current_dir 在 tauri dev 下通常是 src-tauri/，
+        // 往上 2 层到 workspace root
         let current_dir = std::env::current_dir()
             .map_err(|e| format!("获取当前目录失败: {}", e))?;
-        let project_root = current_dir
+        let workspace_root = current_dir
             .parent()
             .ok_or("无法获取项目根目录")?
             .parent()
-            .ok_or("无法获取项目根目录")?;
-        let tool_path = project_root
-            .join("tauri-tail-maker-external")
-            .join("target")
-            .join("release")
-            .join("tail-maker-external.exe");
+            .ok_or("无法获取工作区根目录")?;
 
-        if tool_path.exists() {
-            return Ok(tool_path.to_string_lossy().to_string());
+        // Cargo workspace 构建产物统一在 workspace_root/target/ 下
+        for profile in &["release", "debug"] {
+            let exe = workspace_root.join("target").join(profile).join("tail-maker-external.exe");
+            if exe.exists() {
+                return Ok(exe.to_string_lossy().to_string());
+            }
         }
-        return Err("开发模式下未找到小工具，请先运行 npm run build:tools".to_string());
+        return Err("开发模式下未找到小工具，请先编译 tauri-tail-maker-external".to_string());
     }
 
     // 打包模式：从资源目录获取

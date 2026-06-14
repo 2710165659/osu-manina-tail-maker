@@ -1,51 +1,118 @@
 /**
- * osu!mania Tail Maker External Tool - Script
+ * osu!mania Tail Maker External Tool
+ * Matches OneClickLength.vue functionality (vanilla JS)
  */
-const { invoke } = window.__TAURI__.core;
+
+// Detect Tauri invoke API — try multiple known paths
+let invoke;
+(function () {
+  // __TAURI_INTERNALS__ is the low-level IPC bridge (always present)
+  const ti = window.__TAURI_INTERNALS__;
+  if (ti && typeof ti.invoke === 'function') {
+    invoke = function (cmd, args) {
+      return ti.invoke(cmd, args);
+    };
+    console.log('[tail-maker] invoke via __TAURI_INTERNALS__.invoke');
+    return;
+  }
+
+  const t = window.__TAURI__;
+
+  // Log for debugging
+  if (t) {
+    console.log('[tail-maker] window.__TAURI__ keys:', Object.keys(t).join(', '));
+  } else {
+    console.log('[tail-maker] window.__TAURI__ is undefined');
+  }
+  if (ti) {
+    console.log('[tail-maker] window.__TAURI_INTERNALS__ keys:', Object.keys(ti).join(', '));
+  } else {
+    console.log('[tail-maker] window.__TAURI_INTERNALS__ is undefined');
+  }
+
+  if (!t) return;
+
+  // Try known paths for invoke
+  if (typeof t.invoke === 'function') {
+    invoke = t.invoke.bind(t);
+  } else if (t.tauri && typeof t.tauri.invoke === 'function') {
+    invoke = t.tauri.invoke.bind(t.tauri);
+  } else if (t.core && typeof t.core.invoke === 'function') {
+    invoke = t.core.invoke.bind(t.core);
+  } else {
+    for (const key of Object.keys(t)) {
+      try {
+        const sub = t[key];
+        if (sub && typeof sub === 'object' && typeof sub.invoke === 'function') {
+          invoke = sub.invoke.bind(sub);
+          break;
+        }
+      } catch (_) {}
+    }
+  }
+  if (invoke) {
+    console.log('[tail-maker] invoke found via window.__TAURI__');
+  } else {
+    console.log('[tail-maker] invoke NOT FOUND');
+  }
+})();
+
+// ============================================
+// Helpers
+// ============================================
+const $ = (id) => document.getElementById(id);
+
+function presetSrc(path) {
+  if (path.startsWith('data:')) return path;
+  // Tauri v2: use asset protocol
+  return `asset://localhost/${encodeURIComponent(path)}`;
+}
+
+function getModeThrow(info) {
+  if (state.workMode === 'lazer') {
+    return info.lazer_throw > 0 ? info.lazer_throw : '…';
+  }
+  return info.current_throw;
+}
+
+function show(el) { if (el) el.classList.remove('hidden'); }
+function hide(el) { if (el) el.classList.add('hidden'); }
 
 // ============================================
 // State
 // ============================================
 const state = {
-  mode: 'lazer',
-  presets: [],
-  keys: [],
-  keydInfos: [],       // { stem, as_key: [], as_keyd: [] }
-  imageKeyInfos: [],   // { stem, image_path, used_by: [{keys, columns}] }
-  skinThrowInfos: [],  // { keys, current_throw, lazer_throw, valid, ... }
+  filePath: '',
+  workMode: 'lazer',
+  skinInfo: [],
+  throwMap: new Map(),
+  loadingInfo: false,
+  computingThrows: false,
+  keydInfos: [],
   keydChecked: new Set(),
+  imageKeyInfos: [],
+  presets: [],
   stemPresets: {},
-  throwMap: {},         // keys → target throw
-  skinRoot: null,
-  initialized: false,
+  presetDialogStem: null,
+  modifying: false,
 };
 
-// ============================================
-// DOM
-// ============================================
-const $ = (id) => document.getElementById(id);
+const throwCache = new Map(); // stem → Promise<number>
 
 // ============================================
 // Log
 // ============================================
-function addLog(message, type = "info") {
-  const logContent = $("log-content");
-  const empty = logContent.querySelector(".log-empty");
+function addLog(message, type = 'info') {
+  const logContent = $('log-content');
+  const empty = logContent.querySelector('.log-empty');
   if (empty) empty.remove();
   const now = new Date();
-  const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-  const line = document.createElement("div");
+  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+  const line = document.createElement('div');
   line.className = `log-line ${type}`;
   line.innerHTML = `<span class="log-time">${time}</span><span class="log-marker">›</span><span class="log-msg">${message}</span>`;
   logContent.appendChild(line);
   logContent.scrollTop = logContent.scrollHeight;
-}
-
-// ============================================
-// Helpers
-// ============================================
-function getModeThrow(info) {
-  return state.mode === 'lazer' ? info.lazer_throw : info.current_throw;
 }
 
 // ============================================
@@ -56,210 +123,561 @@ function setupModeRadios() {
     card.addEventListener('click', () => {
       document.querySelectorAll('#mode-radios .radio-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
-      state.mode = card.dataset.mode;
+      state.workMode = card.dataset.mode;
+
+      // Recompute throwMap defaults when mode changes
+      if (state.skinInfo.length > 0) {
+        for (const [k] of state.throwMap) {
+          const s = state.skinInfo.find(i => i.keys === k);
+          if (s && s.valid) {
+            const def = getModeThrow(s);
+            state.throwMap.set(k, typeof def === 'number' ? def : s.current_throw);
+          }
+        }
+      }
+
       renderKeydSection();
-      renderThrowKeys();
+      renderThrowSection();
     });
   });
+}
+
+// ============================================
+// Browse button
+// ============================================
+async function handleBrowse() {
+  try {
+    const selected = await invoke('browse_folder');
+    if (selected) {
+      state.filePath = selected;
+      addLog(`已选择：${state.filePath}`, 'info');
+      updatePathDisplay();
+      await loadAll();
+    }
+  } catch (e) {
+    addLog(`文件选择失败：${e}`, 'error');
+  }
+}
+
+function updatePathDisplay() {
+  const el = $('path-text');
+  if (state.filePath) {
+    el.textContent = state.filePath;
+    el.classList.remove('placeholder');
+  } else {
+    el.textContent = '请选择皮肤所在文件夹';
+    el.classList.add('placeholder');
+  }
+}
+
+// ============================================
+// canModify
+// ============================================
+function canModify() {
+  if (!state.filePath) return false;
+  if (state.modifying) return false;
+  if (state.throwMap.size === 0) return false;
+  for (const v of state.throwMap.values()) { if (!v || v < 1) return false; }
+  return true;
+}
+
+function updateModifyBtn() {
+  const btn = $('modify-btn');
+  const span = $('modify-btn-text');
+  if (state.modifying) {
+    btn.disabled = true;
+    span.textContent = '修改中...';
+  } else {
+    btn.disabled = !canModify();
+    span.textContent = '开始修改';
+  }
 }
 
 // ============================================
 // Key/KeyD section
 // ============================================
+function toggleKeyd(stem) {
+  if (state.keydChecked.has(stem)) state.keydChecked.delete(stem);
+  else state.keydChecked.add(stem);
+}
+
 function renderKeydSection() {
   const section = $('keyd-section');
-  if (state.mode !== 'lazer' || state.keydInfos.length === 0) {
-    section.classList.add('hidden');
+  const loading = $('keyd-loading');
+  const empty = $('keyd-empty');
+  const noPath = $('keyd-no-path');
+  const scroll = $('keyd-scroll');
+  const grid = $('keyd-grid');
+  const label = $('keyd-label');
+  const countHint = $('keyd-count-hint');
+  const hintBottom = $('keyd-hint-bottom');
+
+  // Hide everything first
+  hide(loading); hide(empty); hide(noPath); hide(scroll);
+  hide(countHint); hide(hintBottom);
+
+  if (state.workMode !== 'lazer') {
+    hide(section);
     return;
   }
-  section.classList.remove('hidden');
+  show(section);
 
-  const list = $('keyd-list');
-  list.innerHTML = '';
+  if (!state.filePath) {
+    show(noPath);
+    return;
+  }
+
+  if (state.loadingInfo) {
+    show(loading);
+    return;
+  }
+
+  if (state.keydInfos.length === 0) {
+    show(empty);
+    return;
+  }
+
+  // Show grid
+  const checked = state.keydChecked.size;
+  label.innerHTML = `Key/KeyD 修复<span> (${checked}/${state.keydInfos.length})</span>`;
+  show(countHint);
+  countHint.textContent = `共 ${state.keydInfos.length} 张 Key/KeyD 图片`;
+  show(scroll);
+  show(hintBottom);
+
+  grid.innerHTML = '';
   state.keydInfos.forEach(kd => {
-    const row = document.createElement('div');
-    row.className = `keyd-row${state.keydChecked.has(kd.stem) ? ' active' : ''}`;
+    const item = document.createElement('label');
+    item.className = `repair-item${state.keydChecked.has(kd.stem) ? ' active' : ''}`;
+
     const tags = [];
-    if (kd.as_key.length > 0) tags.push(`<span class="kd-tag kd-key">Key: ${kd.as_key.map(k => k + 'k').join(', ')}</span>`);
-    if (kd.as_keyd.length > 0) tags.push(`<span class="kd-tag kd-keyd">KeyD: ${kd.as_keyd.map(k => k + 'k').join(', ')}</span>`);
-    row.innerHTML = `
-      <label class="kdr-check">
-        <input type="checkbox" ${state.keydChecked.has(kd.stem) ? 'checked' : ''} />
-        <span class="kdr-stem">${kd.stem}</span>
-      </label>
-      <div class="kdr-usage">${tags.join(' ')}</div>
+    if (kd.as_key.length > 0) tags.push('<span class="ri-tag ri-key">Key</span>');
+    if (kd.as_keyd.length > 0) tags.push('<span class="ri-tag ri-keyd">KeyD</span>');
+
+    item.innerHTML = `
+      <input type="checkbox" ${state.keydChecked.has(kd.stem) ? 'checked' : ''} />
+      <span class="ri-stem">${kd.stem}</span>
+      ${tags.join('')}
     `;
-    row.querySelector('input').addEventListener('change', (e) => {
+
+    item.querySelector('input').addEventListener('change', (e) => {
       if (e.target.checked) state.keydChecked.add(kd.stem);
       else state.keydChecked.delete(kd.stem);
-      row.classList.toggle('active', e.target.checked);
+      item.classList.toggle('active', e.target.checked);
+      label.innerHTML = `Key/KeyD 修复<span> (${state.keydChecked.size}/${state.keydInfos.length})</span>`;
     });
-    list.appendChild(row);
+
+    item.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      const cb = item.querySelector('input');
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event('change'));
+    });
+
+    grid.appendChild(item);
   });
 }
 
 // ============================================
-// Preset section (by stem)
+// Preset section
 // ============================================
 function renderPresetSection() {
   const section = $('preset-section');
-  if (state.presets.length === 0 || state.imageKeyInfos.length === 0) {
-    section.classList.add('hidden');
+  const loading = $('preset-loading');
+  const empty = $('preset-empty');
+  const noPath = $('preset-no-path');
+  const scroll = $('preset-scroll');
+  const table = $('preset-table');
+  const label = $('preset-label');
+  const countHint = $('preset-count-hint');
+  const hintBottom = $('preset-hint-bottom');
+
+  hide(loading); hide(empty); hide(noPath); hide(scroll);
+  hide(countHint); hide(hintBottom);
+
+  if (!state.filePath) {
+    show(section);
+    show(noPath);
     return;
   }
-  section.classList.remove('hidden');
 
-  const list = $('preset-stem-list');
-  list.innerHTML = '';
+  if (state.loadingInfo) {
+    show(section);
+    show(loading);
+    return;
+  }
+
+  if (state.imageKeyInfos.length === 0) {
+    show(section);
+    show(empty);
+    return;
+  }
+
+  show(section);
+
+  const presetCount = Object.values(state.stemPresets).filter(Boolean).length;
+  label.innerHTML = `预设替换<span> (${presetCount}/${state.imageKeyInfos.length})</span>`;
+  show(countHint);
+  countHint.textContent = `共 ${state.imageKeyInfos.length} 张面尾图片可替换`;
+  show(scroll);
+  show(hintBottom);
+
+  table.innerHTML = '';
   state.imageKeyInfos.forEach(ik => {
     const row = document.createElement('div');
     row.className = 'preset-row';
-    const usage = ik.used_by.map(u => `<span class="ps-usage-item">${u.keys}k (列${u.columns.join(',')})</span>`).join(' ');
+
+    const usage = ik.used_by.map(u =>
+      `<span class="ps-usage-item">${u.keys}k (列${u.columns.join(',')})</span>`
+    ).join('');
+
     const preset = state.stemPresets[ik.stem];
     row.innerHTML = `
       <span class="psr-stem" title="${ik.image_path}">${ik.stem}</span>
       <div class="psr-usage">${usage}</div>
       <div class="psr-preset">
-        ${preset ? `<div class="preset-selected" data-stem="${ik.stem}">
-          <img src="asset://localhost/${encodeURIComponent(preset.image_path)}" class="preset-thumb" />
-          <span class="preset-name-sm">${preset.name}</span>
-          <button class="preset-clear" data-stem="${ik.stem}">×</button>
-        </div>` : `<button class="preset-pick-btn" data-stem="${ik.stem}">选择预设</button>`}
+        ${preset ? `
+          <div class="preset-selected" data-stem="${ik.stem}">
+            <img src="${presetSrc(preset.image_path)}" class="preset-thumb" />
+            <span class="preset-name-sm">${preset.name}</span>
+            <button class="preset-clear" data-stem="${ik.stem}">×</button>
+          </div>` : `
+          <button class="preset-pick-btn" data-stem="${ik.stem}">选择预设</button>`}
       </div>
     `;
-    // Click preset picker
-    row.querySelector('.preset-pick-btn')?.addEventListener('click', () => openPresetPicker(ik.stem));
-    row.querySelector('.preset-selected')?.addEventListener('click', () => openPresetPicker(ik.stem));
-    row.querySelector('.preset-clear')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      delete state.stemPresets[ik.stem];
-      renderPresetSection();
-    });
-    list.appendChild(row);
+
+    // Events
+    const pickBtn = row.querySelector('.preset-pick-btn');
+    const selected = row.querySelector('.preset-selected');
+    const clearBtn = row.querySelector('.preset-clear');
+
+    if (pickBtn) pickBtn.addEventListener('click', () => openPresetDialog(ik.stem));
+    if (selected) selected.addEventListener('click', () => openPresetDialog(ik.stem));
+    if (clearBtn) {
+      clearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.stemPresets[ik.stem] = null;
+        renderPresetSection();
+      });
+    }
+
+    table.appendChild(row);
   });
 }
 
 // ============================================
-// Preset picker (simple dropdown-like inline modal)
+// Preset modal
 // ============================================
-let currentPresetStem = null;
+function openPresetDialog(stem) {
+  state.presetDialogStem = stem;
+  $('preset-modal-title').textContent = `选择预设 - ${stem}`;
+  const grid = $('preset-modal-grid');
+  grid.innerHTML = '';
 
-function openPresetPicker(stem) {
-  currentPresetStem = stem;
-  // Build grid overlay
-  const existing = document.querySelector('.preset-picker-overlay');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.className = 'preset-picker-overlay';
-  const grid = document.createElement('div');
-  grid.className = 'preset-picker-grid';
   state.presets.forEach(p => {
     const card = document.createElement('div');
-    card.className = `preset-picker-card${state.stemPresets[stem]?.name === p.name ? ' active' : ''}`;
+    card.className = `preset-card${state.stemPresets[stem]?.name === p.name ? ' active' : ''}`;
     card.innerHTML = `
-      <div class="preset-picker-img-wrap"><img src="asset://localhost/${encodeURIComponent(p.image_path)}" class="preset-picker-img" /></div>
-      <span class="preset-picker-label">${p.name}</span>
+      <div class="preset-img-wrap">
+        <img src="${presetSrc(p.image_path)}" class="preset-img" />
+      </div>
+      <span class="preset-label">${p.name}</span>
     `;
-    card.addEventListener('click', () => {
-      state.stemPresets[stem] = p;
-      addLog(`${stem} 选择预设: ${p.name}`, 'info');
-      overlay.remove();
-      renderPresetSection();
-    });
+    card.addEventListener('click', () => selectPreset(stem, p));
     grid.appendChild(card);
   });
-  overlay.appendChild(grid);
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
+
+  show($('preset-modal-overlay'));
+}
+
+function selectPreset(stem, preset) {
+  state.stemPresets[stem] = preset;
+  state.presetDialogStem = null;
+  hide($('preset-modal-overlay'));
+  addLog(`${stem} 选择预设: ${preset.name}`, 'info');
+  renderPresetSection();
+}
+
+function closePresetDialog() {
+  state.presetDialogStem = null;
+  hide($('preset-modal-overlay'));
 }
 
 // ============================================
-// Throw keys section
+// Throw section
 // ============================================
-function renderThrowKeys() {
-  const list = $('keys-throw-list');
-  if (state.keys.length === 0) {
-    list.innerHTML = '<span style="color: var(--text-muted); font-size: 12px;">未找到键数配置</span>';
+function toggleKey(k) {
+  const info = state.skinInfo.find(s => s.keys === k);
+  if (!info || !info.valid) return;
+  if (state.throwMap.has(k)) {
+    state.throwMap.delete(k);
+  } else {
+    const def = getModeThrow(info);
+    state.throwMap.set(k, typeof def === 'number' ? def : info.current_throw);
+  }
+}
+
+function getUniqueKeyInfos() {
+  const seen = new Set();
+  return state.skinInfo
+    .filter(s => { if (seen.has(s.keys)) return false; seen.add(s.keys); return true; })
+    .sort((a, b) => a.keys - b.keys);
+}
+
+function renderThrowSection() {
+  const loading = $('throw-loading');
+  const empty = $('throw-empty');
+  const noPath = $('throw-no-path');
+  const scroll = $('throw-scroll');
+  const grid = $('throw-grid');
+  const label = $('throw-label');
+  const countHint = $('throw-count-hint');
+  const computingHint = $('throw-computing');
+  const hintBottom = $('throw-hint-bottom');
+
+  hide(loading); hide(empty); hide(noPath); hide(scroll);
+  hide(countHint); hide(computingHint); hide(hintBottom);
+
+  if (!state.filePath) {
+    show(noPath);
     return;
   }
 
-  list.innerHTML = '';
-  state.keys.forEach(key => {
-    const info = state.skinThrowInfos.find(s => s.keys === key);
-    if (!info) return;
-    const row = document.createElement('div');
-    row.className = `key-row${state.throwMap[key] !== undefined ? ' active' : ''}${!info.valid ? ' invalid' : ''}`;
-    const checked = state.throwMap[key] !== undefined;
-    const val = state.throwMap[key] ?? getModeThrow(info);
-    row.innerHTML = `
-      <label class="kr-check">
+  if (state.loadingInfo) {
+    show(loading);
+    return;
+  }
+
+  if (state.skinInfo.length === 0) {
+    show(empty);
+    return;
+  }
+
+  const unique = getUniqueKeyInfos();
+  if (state.computingThrows) show(computingHint);
+
+  label.innerHTML = `修改投长度<span> (${state.throwMap.size}/${unique.length})</span>`;
+  show(countHint);
+  countHint.textContent = `共 ${unique.length} 个键数`;
+  show(scroll);
+  show(hintBottom);
+
+  grid.innerHTML = '';
+  unique.forEach(info => {
+    const card = document.createElement('div');
+    card.className = `throw-card${state.throwMap.has(info.keys) ? ' active' : ''}${!info.valid ? ' invalid' : ''}`;
+
+    const checked = state.throwMap.has(info.keys);
+    const val = state.throwMap.get(info.keys) ?? '';
+    const origText = info.valid ? `原: ${getModeThrow(info)}` : '不合规';
+
+    card.innerHTML = `
+      <label class="tc-check">
         <input type="checkbox" ${checked ? 'checked' : ''} ${!info.valid ? 'disabled' : ''} />
-        <span class="kr-keys">${key}k</span>
+        <span class="tc-keys">${info.keys}k</span>
       </label>
-      <div class="kr-current">
-        ${!info.valid ? '<span class="badge-invalid">不合规</span>' : `<span>${getModeThrow(info)}px</span>`}
-      </div>
-      <div class="kr-target">
-        ${checked && info.valid ? `<div class="target-input-wrap"><input type="number" class="target-input" value="${val}" min="1" /><span class="target-suffix">px</span></div>` : '<span class="kr-na">-</span>'}
-      </div>
+      <input type="number" class="tc-input" value="${val}" ${!checked || !info.valid ? 'disabled' : ''} placeholder="-" min="1" />
+      <span class="tc-orig">${origText}</span>
     `;
-    const cb = row.querySelector('input[type=checkbox]');
+
+    // Checkbox change
+    const cb = card.querySelector('input[type="checkbox"]');
     cb.addEventListener('change', () => {
       if (cb.checked) {
-        state.throwMap[key] = getModeThrow(info);
+        const def = getModeThrow(info);
+        state.throwMap.set(info.keys, typeof def === 'number' ? def : info.current_throw);
       } else {
-        delete state.throwMap[key];
+        state.throwMap.delete(info.keys);
       }
-      renderThrowKeys();
+      renderThrowSection();
+      updateModifyBtn();
     });
-    const input = row.querySelector('.target-input');
-    if (input) {
-      input.addEventListener('input', () => {
-        const v = parseInt(input.value, 10);
-        if (v > 0) state.throwMap[key] = v;
-      });
-    }
-    list.appendChild(row);
+
+    // Number input
+    const numInput = card.querySelector('input[type="number"]');
+    numInput.addEventListener('input', () => {
+      const v = Number(numInput.value);
+      if (v > 0) state.throwMap.set(info.keys, v);
+      updateModifyBtn();
+    });
+
+    grid.appendChild(card);
   });
-  updateConvertBtn();
+
+  updateModifyBtn();
 }
 
 // ============================================
-// Convert
+// Load all data
 // ============================================
-function updateConvertBtn() {
-  const btn = $('convert-btn');
-  btn.disabled = !(state.skinRoot && Object.keys(state.throwMap).length > 0);
+async function loadAll() {
+  state.loadingInfo = true;
+  state.throwMap.clear();
+  throwCache.clear();
+  Object.keys(state.stemPresets).forEach(k => delete state.stemPresets[k]);
+  state.keydChecked.clear();
+  state.keydInfos = [];
+  state.imageKeyInfos = [];
+  state.presets = [];
+  state.skinInfo = [];
+
+  // Phase 1: Key/KeyD
+  await loadKeydList();
+  // Phase 2: Presets
+  await loadPresetList();
+  // Phase 3: Throw info + computation
+  await loadThrowInfo();
+
+  state.loadingInfo = false;
+
+  renderKeydSection();
+  renderPresetSection();
+  renderThrowSection();
+  updateModifyBtn();
 }
 
-async function handleConvert() {
-  if ($('convert-btn').disabled) return;
+async function loadKeydList() {
+  if (state.workMode !== 'lazer') return;
+  addLog('=== 检测 Key、KeyD ===', 'info');
+  try {
+    const kd = await invoke('get_keyd_list', { skinRoot: state.filePath });
+    state.keydInfos = kd;
+    addLog(`已加载 ${kd.length} 个 Key/KeyD 图片`, 'success');
+  } catch (e) { addLog(`Key/KeyD 列表加载失败: ${e}`, 'warning'); state.keydInfos = []; }
+}
 
-  addLog('开始转换任务...', 'info');
-  addLog(`模式: ${state.mode}`, 'info');
+async function loadPresetList() {
+  addLog('=== 加载预设 ===', 'info');
+  try {
+    const ik = await invoke('get_image_key_info', { skinRoot: state.filePath });
+    state.imageKeyInfos = ik;
+    addLog(`已加载 ${ik.length} 个图片关联`, 'info');
+  } catch (e) { addLog(`图片关联加载失败: ${e}`, 'warning'); state.imageKeyInfos = []; }
 
-  const throws = Object.entries(state.throwMap).map(([k, v]) => [parseInt(k), v]);
-  const presets = Object.entries(state.stemPresets).filter(([, v]) => v != null).map(([stem, v]) => [stem, v.name]);
+  try {
+    const p = await invoke('load_presets');
+    state.presets = p;
+    if (p.length > 0) addLog(`已加载 ${p.length} 个预设`, 'success');
+    else addLog('未找到预设图片', 'info');
+  } catch (e) { addLog(`预设加载失败: ${e}`, 'warning'); }
+}
+
+async function loadThrowInfo() {
+  addLog('=== 计算投长度 ===', 'info');
+  try {
+    const info = await invoke('get_skin_throw_info', { skinRoot: state.filePath });
+    state.skinInfo = info;
+    addLog('皮肤信息读取完成', 'success');
+
+    const keySet = new Set(info.map(s => s.keys));
+    const keys = [...keySet].sort((a, b) => a - b);
+
+    if (keys.length > 0) {
+      addLog(`检测到键数: ${keys.map(k => k + 'k').join(', ')}`, 'info');
+      for (const s of info.filter(i => !i.valid)) {
+        addLog(`⚠ ${s.keys}k ${s.stem}: 高度 ${s.height}px，不满足 >5000，不可修改`, 'warning');
+      }
+    } else {
+      addLog('未找到任何 NoteImage#L 面尾定义', 'warning');
+    }
+
+    await computeAllThrows();
+  } catch (e) {
+    addLog(`读取皮肤信息失败：${e}`, 'error');
+  }
+}
+
+async function computeAllThrows() {
+  if (state.workMode !== 'lazer') return;
+
+  // Dedup by stem only
+  const seenStems = new Set();
+  const stems = [];
+
+  for (const s of state.skinInfo) {
+    if (!s.valid) continue;
+    if (seenStems.has(s.stem)) continue;
+    seenStems.add(s.stem);
+    stems.push(s.stem);
+  }
+
+  if (stems.length === 0) {
+    addLog('无需计算投长度', 'info');
+    return;
+  }
+
+  state.computingThrows = true;
+  renderThrowSection();
+
+  try {
+    // Batch compute all stems at once
+    addLog(`正在计算 ${stems.length} 个 stem 的 Lazer 投长度...`, 'info');
+    const results = await invoke('compute_lazer_throws', { skinRoot: state.filePath, stems });
+
+    for (const [stem, lt] of results) {
+      for (const x of state.skinInfo) {
+        if (x.stem === stem) x.lazer_throw = lt;
+      }
+      const keyList = [...new Set(state.skinInfo.filter(x => x.stem === stem).map(x => x.keys))]
+        .sort((a, b) => a - b).map(k => k + 'k').join(', ');
+      addLog(`  ✓ ${stem} (${keyList}) 投长度: ${lt}`, 'success');
+    }
+    addLog('投长度计算完成', 'success');
+  } catch (e) {
+    addLog(`投长度计算失败: ${e}`, 'warning');
+  }
+
+  state.computingThrows = false;
+  renderThrowSection();
+}
+
+// ============================================
+// Modify
+// ============================================
+async function handleModify() {
+  if (!canModify()) return;
+  state.modifying = true;
+  updateModifyBtn();
+
+  addLog(`文件：${state.filePath}`, 'info');
+  addLog(`开始修改... 模式: ${state.workMode}`, 'info');
+
+  const entries = [...state.throwMap.entries()].sort((a, b) => a[0] - b[0]);
+  const throws = entries.map(([k, v]) => [k, v]);
+
+  const presetList = Object.entries(state.stemPresets)
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([stem, v]) => [stem, v.name]);
+
   const keydStems = [...state.keydChecked];
 
   try {
     const result = await invoke('convert_tail', {
       config: {
-        skin_root: state.skinRoot,
-        mode: state.mode,
+        skin_root: state.filePath,
+        mode: state.workMode,
         throws,
-        presets,
+        presets: presetList,
         keyd_stems: keydStems,
       },
     });
+
     for (const line of result.logs) {
-      const type = line.startsWith('  ✓') ? 'success' : line.includes('⚠') || line.startsWith('  ✗') ? 'warning' : 'info';
+      const type = line.startsWith('  ✓') ? 'success'
+        : line.includes('⚠') || line.startsWith('  ✗') ? 'warning'
+        : 'info';
       addLog(line, type);
     }
-    addLog(result.message, result.success ? 'success' : 'error');
+    if (result.success) {
+      addLog('修改完成！', 'success');
+    } else {
+      addLog(`修改失败: ${result.message}`, 'error');
+    }
   } catch (e) {
-    addLog(`转换失败: ${e}`, 'error');
+    addLog(`修改失败：${e}`, 'error');
+  } finally {
+    state.modifying = false;
+    updateModifyBtn();
   }
 }
 
@@ -268,8 +686,21 @@ async function handleConvert() {
 // ============================================
 async function init() {
   addLog('正在初始化...', 'info');
+  if (typeof invoke !== 'function') {
+    addLog('致命错误：Tauri invoke 不可用', 'error');
+    addLog('window.__TAURI__ keys: ' + (window.__TAURI__ ? Object.keys(window.__TAURI__).join(', ') : 'undefined'), 'warning');
+    addLog('window.__TAURI_INTERNALS__ keys: ' + (window.__TAURI_INTERNALS__ ? Object.keys(window.__TAURI_INTERNALS__).join(', ') : 'undefined'), 'warning');
+    return;
+  }
+
+  // Setup event listeners
   setupModeRadios();
-  $('convert-btn').addEventListener('click', handleConvert);
+  $('browse-btn').addEventListener('click', handleBrowse);
+  $('modify-btn').addEventListener('click', handleModify);
+  $('preset-modal-close').addEventListener('click', closePresetDialog);
+  $('preset-modal-overlay').addEventListener('mousedown', (e) => {
+    if (e.target === $('preset-modal-overlay')) closePresetDialog();
+  });
 
   // GitHub link
   const githubLink = $('github-link');
@@ -279,77 +710,28 @@ async function init() {
     });
   }
 
+  // Auto-find skin root
   try {
-    // 1. Find skin root
     const skinResult = await invoke('find_skin_root');
-    if (!skinResult.success) {
-      addLog(skinResult.message, 'error');
-      addLog('请将程序放在皮肤目录附近', 'warning');
-      $('convert-btn').disabled = true;
-      return;
-    }
-    state.skinRoot = skinResult.path;
-    addLog(`找到皮肤目录: ${state.skinRoot}`, 'success');
-
-    // 2. Find keys
-    const keyResult = await invoke('find_keys', { skinRoot: state.skinRoot });
-    if (keyResult.success) {
-      state.keys = keyResult.keys;
-      addLog(keyResult.message, 'info');
+    if (skinResult.success) {
+      state.filePath = skinResult.path;
+      addLog(`找到皮肤目录: ${state.filePath}`, 'success');
+      updatePathDisplay();
+      await loadAll();
     } else {
-      addLog(keyResult.message, 'error');
+      addLog(skinResult.message, 'warning');
+      addLog('请点击"浏览"选择皮肤文件夹', 'info');
     }
-
-    // 3. Load throw info
-    addLog('正在读取皮肤信息...', 'info');
-    state.skinThrowInfos = await invoke('get_skin_throw_info', { skinRoot: state.skinRoot });
-    addLog('皮肤信息读取完成', 'success');
-
-    // Lazy compute lazer throws if in lazer mode
-    if (state.mode === 'lazer') {
-      const validStems = state.skinThrowInfos.filter(s => s.valid).map(s => s.stem);
-      if (validStems.length > 0) {
-        try {
-          addLog('正在计算 Lazer 投长度...', 'info');
-          const lazerResults = await invoke('compute_lazer_throws', { skinRoot: state.skinRoot, stems: validStems });
-          for (const [stem, lt] of lazerResults) {
-            const s = state.skinThrowInfos.find(i => i.stem === stem);
-            if (s) s.lazer_throw = lt;
-          }
-          addLog('Lazer 投长度计算完成', 'success');
-        } catch (e) {
-          addLog(`Lazer 投长度计算失败: ${e}`, 'warning');
-        }
-      }
-    }
-
-    // 4. Load image-key info
-    try {
-      state.imageKeyInfos = await invoke('get_image_key_info', { skinRoot: state.skinRoot });
-    } catch (_) {}
-    // 5. Load Key/KeyD info
-    try {
-      state.keydInfos = await invoke('get_keyd_list', { skinRoot: state.skinRoot });
-      state.keydInfos.forEach(kd => state.keydChecked.add(kd.stem));
-    } catch (_) {}
-    // 6. Load presets
-    addLog('正在加载预设...', 'info');
-    try {
-      state.presets = await invoke('load_presets');
-      addLog(`已加载 ${state.presets.length} 个预设`, 'info');
-    } catch (_) {}
-
-    // Render sections
-    renderKeydSection();
-    renderPresetSection();
-    renderThrowKeys();
-
-    state.initialized = true;
-    updateConvertBtn();
   } catch (e) {
     addLog(`初始化失败: ${e}`, 'error');
-    $('convert-btn').disabled = true;
+    addLog('请点击"浏览"选择皮肤文件夹', 'info');
   }
+
+  // Always render initial state (show placeholders)
+  renderKeydSection();
+  renderPresetSection();
+  renderThrowSection();
+  updateModifyBtn();
 }
 
 document.addEventListener('DOMContentLoaded', init);

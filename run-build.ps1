@@ -28,19 +28,11 @@ if (-not (Test-Path $SrcDir)) {
     } else {
         $buildTime = (Get-Item $ExePath).LastWriteTime
 
-        $srcLatest = if (Test-Path $SrcDir) {
-            (Get-ChildItem -Path $SrcDir, $SharedDir -Recurse -File -ErrorAction SilentlyContinue |
-                Sort-Object LastWriteTime -Descending |
-                Select-Object -First 1).LastWriteTime
-        } else { [datetime]::MinValue }
-
-        $frontendLatest = if (Test-Path $FrontendDir) {
-            (Get-ChildItem -Path $FrontendDir -Recurse -File -ErrorAction SilentlyContinue |
-                Sort-Object LastWriteTime -Descending |
-                Select-Object -First 1).LastWriteTime
-        } else { [datetime]::MinValue }
-
-        $latestSrcTime = if ($srcLatest -gt $frontendLatest) { $srcLatest } else { $frontendLatest }
+        # 获取所有源文件的最新修改时间（排除 target/ 构建产物）
+        $latestSrcTime = (Get-ChildItem -Path $ToolsDir, $SharedDir -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '[\\/]target[\\/]' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1).LastWriteTime
 
         if ($latestSrcTime -and ($latestSrcTime -gt $buildTime)) {
             Write-Host "📝 检测到代码更新，需要重新编译" -ForegroundColor Yellow
