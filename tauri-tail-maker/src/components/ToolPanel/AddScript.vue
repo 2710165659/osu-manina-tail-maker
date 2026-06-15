@@ -7,28 +7,21 @@
 
     <!-- 配置区域 -->
     <div class="config-group">
-      <!-- 目标范围 -->
+      <!-- 皮肤文件夹 -->
       <div class="field">
-        <label class="field-label">目标范围</label>
-        <div class="radio-cards">
-          <label :class="['radio-card', { active: targetMode === 'folder' }]" @click="targetMode = 'folder'">
-            <div class="radio-dot">
-              <div class="radio-dot-inner"></div>
-            </div>
-            <div class="radio-content">
-              <span class="radio-title">皮肤文件夹</span>
-              <span class="radio-desc">选择已解压的皮肤文件夹，直接在其下创建脚本。</span>
-            </div>
-          </label>
-          <label :class="['radio-card', { active: targetMode === 'osk' }]" @click="targetMode = 'osk'">
-            <div class="radio-dot">
-              <div class="radio-dot-inner"></div>
-            </div>
-            <div class="radio-content">
-              <span class="radio-title">osk 文件</span>
-              <span class="radio-desc">选择单个 .osk 文件，解压后添加脚本并重新打包。</span>
-            </div>
-          </label>
+        <label class="field-label">皮肤文件夹</label>
+        <div class="path-group">
+          <div class="path-display">
+            <svg class="path-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1.5 3.5h4l1.5 2h5.5a1 1 0 011 1v5a1 1 0 01-1 1h-11a1 1 0 01-1-1v-7a1 1 0 011-1z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="path-text" :class="{ placeholder: !filePath }">
+              {{ filePath || '请选择皮肤文件夹' }}
+            </span>
+          </div>
+          <button class="browse-btn" @click="handleBrowse">
+            <span>浏览</span>
+          </button>
         </div>
       </div>
 
@@ -52,30 +45,6 @@
           </label>
         </div>
         <span class="field-hint">可选，选择要写入脚本的预设，脚本运行时可从这些预设中切换</span>
-      </div>
-
-      <!-- 皮肤文件夹 -->
-      <div class="field">
-        <label class="field-label">皮肤文件夹</label>
-        <div class="path-group">
-          <div class="path-display">
-            <svg class="path-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path v-if="targetMode === 'osk'" d="M1.5 7.5v3.5a1 1 0 001 1h9a1 1 0 001-1V7.5" stroke="currentColor"
-                stroke-width="1.1" stroke-linecap="round" />
-              <path v-if="targetMode === 'osk'" d="M7 1.5v6M4.5 5L7 7.5 9.5 5" stroke="currentColor" stroke-width="1.1"
-                stroke-linecap="round" stroke-linejoin="round" />
-              <path v-if="targetMode === 'folder'"
-                d="M1.5 3.5h4l1.5 2h5.5a1 1 0 011 1v5a1 1 0 01-1 1h-11a1 1 0 01-1-1v-7a1 1 0 011-1z"
-                stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <span class="path-text" :class="{ placeholder: !filePath }">
-              {{ filePath || pathPlaceholder }}
-            </span>
-          </div>
-          <button class="browse-btn" @click="handleBrowse">
-            <span>浏览</span>
-          </button>
-        </div>
       </div>
 
       <!-- 操作按钮 -->
@@ -122,20 +91,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useConfig } from '../../composables/useConfig'
 
 const { presets } = useConfig()
 
-const targetMode = ref<'osk' | 'folder'>('folder')
 const filePath = ref('')
 const selectedPresetNames = ref(new Set<string>())
 const executing = ref(false)
 const logContainer = ref<HTMLDivElement>()
-
-watch(targetMode, () => {
-  filePath.value = ''
-})
 
 interface LogEntry {
   time: string
@@ -144,10 +108,6 @@ interface LogEntry {
 }
 
 const logs = ref<LogEntry[]>([])
-
-const pathPlaceholder = computed(() => {
-  return targetMode.value === 'osk' ? '请选择 .osk 文件' : '请选择皮肤文件夹'
-})
 
 const canExecute = computed(() => {
   return !!filePath.value
@@ -176,22 +136,19 @@ async function handleBrowse() {
   const { open } = await import('@tauri-apps/plugin-dialog')
 
   try {
-    let selected: string | string[] | null = null
-
-    if (targetMode.value === 'osk') {
-      selected = await open({
-        multiple: false,
-        filters: [{ name: 'osk 文件', extensions: ['osk'] }],
-      })
-    } else {
-      selected = await open({
-        multiple: false,
-        directory: true,
-      })
-    }
+    const selected = await open({
+      multiple: false,
+      directory: true,
+    })
 
     if (selected) {
       const path = Array.isArray(selected) ? selected[0] : selected
+      const { invoke } = await import('@tauri-apps/api/core')
+      const valid = await invoke('check_skin_ini', { folderPath: path })
+      if (!valid) {
+        addLog(`✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录`, 'error')
+        return
+      }
       filePath.value = path
       addLog(`已选择：${path}`, 'info')
     }
@@ -208,7 +165,6 @@ async function handleAddScript() {
   const selectedPresets = presets.value.filter(p => selectedPresetNames.value.has(p.name))
 
   addLog('开始添加脚本任务...', 'info')
-  addLog(`目标模式：${targetMode.value === 'osk' ? 'osk 文件' : '皮肤文件夹'}`, 'info')
   addLog(`文件路径：${filePath.value}`, 'info')
   addLog(`选中预设：${selectedPresets.map(p => p.name).join('、')}`, 'info')
 
@@ -233,23 +189,12 @@ async function handleAddScript() {
       }
     }
 
-    if (targetMode.value === 'osk') {
-      // osk 文件：直接修改压缩包
-      addLog('正在将外部工具添加到 osk 文件...', 'info')
-      const result = await invoke('add_external_tool_to_osk_with_presets', {
-        oskPath: filePath.value,
-        presetImages: presetImages,
-      })
-      addLog(`✓ 外部工具已添加到：${result}`, 'success')
-    } else {
-      // 皮肤文件夹：复制文件
-      addLog('正在复制外部工具...', 'info')
-      const result = await invoke('copy_external_tool_with_presets', {
-        targetPath: filePath.value,
-        presetImages: presetImages,
-      })
-      addLog(`✓ 外部工具已复制到：${result}`, 'success')
-    }
+    addLog('正在复制外部工具...', 'info')
+    const result = await invoke('copy_external_tool_with_presets', {
+      targetPath: filePath.value,
+      presetImages: presetImages,
+    })
+    addLog(`✓ 外部工具已复制到：${result}`, 'success')
 
     if (presetImages.length > 0) {
       addLog(`✓ 已添加 ${presetImages.length} 个预设图片`, 'success')
@@ -315,81 +260,6 @@ async function handleAddScript() {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
-}
-
-/* Radio Cards */
-.radio-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.radio-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.radio-card:hover {
-  border-color: rgba(183, 108, 241, 0.3);
-  background: rgba(183, 108, 241, 0.03);
-}
-
-.radio-card.active {
-  border-color: var(--accent-purple);
-  background: rgba(183, 108, 241, 0.06);
-}
-
-.radio-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
-  transition: all 0.2s ease;
-}
-
-.radio-card.active .radio-dot {
-  border-color: var(--accent-purple);
-}
-
-.radio-dot-inner {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: transparent;
-  transition: all 0.2s ease;
-}
-
-.radio-card.active .radio-dot-inner {
-  background: var(--accent-purple);
-}
-
-.radio-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.radio-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.radio-desc {
-  font-size: 10px;
-  color: var(--text-muted);
 }
 
 /* Preset Grid */

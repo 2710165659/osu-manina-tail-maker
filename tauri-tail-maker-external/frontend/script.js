@@ -124,6 +124,7 @@ function setupModeRadios() {
       document.querySelectorAll('#mode-radios .radio-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       state.workMode = card.dataset.mode;
+      addLog(`切换模式: ${state.workMode === 'lazer' ? 'Lazer' : 'Stable'}`, 'info');
 
       // Recompute throwMap defaults when mode changes
       if (state.skinInfo.length > 0) {
@@ -133,6 +134,11 @@ function setupModeRadios() {
             const def = getModeThrow(s);
             state.throwMap.set(k, typeof def === 'number' ? def : s.current_throw);
           }
+        }
+        // 切到 Lazer 时若投长度未计算则触发计算
+        if (state.workMode === 'lazer') {
+          const needCompute = state.skinInfo.some(s => s.valid && s.lazer_throw === 0);
+          if (needCompute) computeAllThrows();
         }
       }
 
@@ -174,11 +180,14 @@ function updatePathDisplay() {
 // canModify
 // ============================================
 function canModify() {
-  if (!state.filePath) return false;
-  if (state.modifying) return false;
-  if (state.throwMap.size === 0) return false;
-  for (const v of state.throwMap.values()) { if (!v || v < 1) return false; }
-  return true;
+  if (!state.filePath || state.modifying) return false;
+  // Key/KeyD 修复：至少勾选一项
+  if (state.keydChecked.size > 0) return true;
+  // 预设替换：至少一项分配了预设
+  if (Object.values(state.stemPresets).filter(Boolean).length > 0) return true;
+  // 修改投长度：至少一项有效
+  for (const v of state.throwMap.values()) { if (v && v >= 1) return true; }
+  return false;
 }
 
 function updateModifyBtn() {
@@ -265,13 +274,7 @@ function renderKeydSection() {
       else state.keydChecked.delete(kd.stem);
       item.classList.toggle('active', e.target.checked);
       label.innerHTML = `Key/KeyD 修复<span> (${state.keydChecked.size}/${state.keydInfos.length})</span>`;
-    });
-
-    item.addEventListener('click', (e) => {
-      if (e.target.tagName === 'INPUT') return;
-      const cb = item.querySelector('input');
-      cb.checked = !cb.checked;
-      cb.dispatchEvent(new Event('change'));
+      updateModifyBtn();
     });
 
     grid.appendChild(item);
@@ -283,6 +286,13 @@ function renderKeydSection() {
 // ============================================
 function renderPresetSection() {
   const section = $('preset-section');
+
+  // 无预设图片时隐藏整个区域
+  if (state.presets.length === 0) {
+    hide(section);
+    return;
+  }
+
   const loading = $('preset-loading');
   const empty = $('preset-empty');
   const noPath = $('preset-no-path');
@@ -464,7 +474,7 @@ function renderThrowSection() {
 
   grid.innerHTML = '';
   unique.forEach(info => {
-    const card = document.createElement('div');
+    const card = document.createElement('label');
     card.className = `throw-card${state.throwMap.has(info.keys) ? ' active' : ''}${!info.valid ? ' invalid' : ''}`;
 
     const checked = state.throwMap.has(info.keys);
@@ -472,10 +482,8 @@ function renderThrowSection() {
     const origText = info.valid ? `原: ${getModeThrow(info)}` : '不合规';
 
     card.innerHTML = `
-      <label class="tc-check">
-        <input type="checkbox" ${checked ? 'checked' : ''} ${!info.valid ? 'disabled' : ''} />
-        <span class="tc-keys">${info.keys}k</span>
-      </label>
+      <input type="checkbox" ${checked ? 'checked' : ''} ${!info.valid ? 'disabled' : ''} />
+      <span class="tc-keys">${info.keys}k</span>
       <input type="number" class="tc-input" value="${val}" ${!checked || !info.valid ? 'disabled' : ''} placeholder="-" min="1" />
       <span class="tc-orig">${origText}</span>
     `;
@@ -623,6 +631,14 @@ async function computeAllThrows() {
       addLog(`  ✓ ${stem} (${keyList}) 投长度: ${lt}`, 'success');
     }
     addLog('投长度计算完成', 'success');
+
+    // 同步已勾选的 throwMap
+    for (const [k] of state.throwMap) {
+      const s = state.skinInfo.find(i => i.keys === k);
+      if (s && s.valid && s.lazer_throw > 0) {
+        state.throwMap.set(k, s.lazer_throw);
+      }
+    }
   } catch (e) {
     addLog(`投长度计算失败: ${e}`, 'warning');
   }
@@ -670,6 +686,17 @@ async function handleModify() {
     }
     if (result.success) {
       addLog('修改完成！', 'success');
+      // 重新加载投长度信息
+      await loadThrowInfo();
+      // 同步已勾选键数的 throwMap
+      for (const [k] of state.throwMap) {
+        const s = state.skinInfo.find(i => i.keys === k);
+        if (s && s.valid) {
+          const def = getModeThrow(s);
+          state.throwMap.set(k, typeof def === 'number' ? def : s.current_throw);
+        }
+      }
+      renderThrowSection();
     } else {
       addLog(`修改失败: ${result.message}`, 'error');
     }

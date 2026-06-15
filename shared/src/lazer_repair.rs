@@ -206,6 +206,12 @@ pub fn execute_lazer_key_repair(
             .map_err(|e| format!("读取图片失败 {}: {}", stem, e))?
             .to_rgba8();
 
+        // 全透明图片跳过修复
+        if image_utils::find_bounding_box(&img).is_none() {
+            add_log(&mut log, &format!("  - {}: 全透明，跳过", stem));
+            continue;
+        }
+
         let mut unique_cw: Vec<u32> = refs.iter().map(|(_, cw)| *cw).collect();
         unique_cw.sort();
         unique_cw.dedup();
@@ -371,6 +377,12 @@ pub fn execute_lazer_key_repair_filtered(
         let img = image::open(&image_path)
             .map_err(|e| format!("读取图片失败 {}: {}", stem, e))?
             .to_rgba8();
+
+        // 全透明图片跳过修复
+        if image_utils::find_bounding_box(&img).is_none() {
+            add_log(&mut log, &format!("  - {}: 全透明，跳过", stem));
+            continue;
+        }
 
         let mut unique_cw: Vec<u32> = refs.iter().map(|(_, cw)| *cw).collect();
         unique_cw.sort();

@@ -19,6 +19,32 @@ pub fn find_first_non_transparent_row(img: &RgbaImage) -> Option<u32> {
     None
 }
 
+/// 裁剪预设缩略图：保留第一个不透明行上方 50px 和下方 200px。
+/// 与主程序的 render_preset_thumbnail 裁剪逻辑一致。
+pub fn crop_preset_thumbnail(img: &RgbaImage) -> RgbaImage {
+    let (w, h) = img.dimensions();
+    if w == 0 || h == 0 {
+        return RgbaImage::new(1, 1);
+    }
+
+    let first_row = match find_first_non_transparent_row(img) {
+        Some(r) => r,
+        None => return RgbaImage::new(w, 1),
+    };
+
+    let pad_top: u32 = 50;
+    let pad_bottom: u32 = 200;
+    let crop_top = first_row.saturating_sub(pad_top);
+    let crop_bottom = (first_row + pad_bottom).min(h);
+    let crop_h = crop_bottom.saturating_sub(crop_top);
+
+    if crop_h > 0 {
+        image::imageops::crop_imm(img, 0, crop_top, w, crop_h).to_image()
+    } else {
+        RgbaImage::new(w, 1)
+    }
+}
+
 /// 流式读取 PNG，从顶部逐行扫描，找到第一个不透明像素所在行号（0-based）。
 /// 只在找到非透明行之前解码必要的行，避免解码整张大图。
 /// 全透明返回 None。

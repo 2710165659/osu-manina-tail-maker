@@ -367,13 +367,16 @@ pub fn execute_throw_modification(
             let current_throw = throw_length::find_throw_length(&img);
 
             let modified = if mode == "lazer" {
+                // current_throw 是原图 Stable 值，转为 Lazer 坐标再打日志，和 target_throw 统一
+                let h = img.height();
+                let current_lazer = if h > 0 { ((current_throw as u64 * 32800) / h as u64) as u32 } else { 0 };
                 add_log(
                     &mut log,
                     &format!(
                         "{} {}k: 投长度 {}px → {}px (Lazer, cw={})",
                         image_path.display(),
                         section.keys,
-                        current_throw,
+                        current_lazer,
                         target_throw,
                         cw,
                     ),

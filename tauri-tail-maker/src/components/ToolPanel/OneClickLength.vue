@@ -113,19 +113,17 @@
               正在计算投长度...</span></span>
           <div class="throw-scroll">
             <div class="throw-grid">
-              <div v-for="info in uniqueKeyInfos" :key="info.keys"
+              <label v-for="info in uniqueKeyInfos" :key="info.keys"
                 :class="['throw-card', { active: throwMap.has(info.keys), invalid: !info.valid }]">
-                <label class="tc-check">
-                  <input type="checkbox" :checked="throwMap.has(info.keys)" :disabled="!info.valid"
-                    @change="toggleKey(info.keys)" />
-                  <span class="tc-keys">{{ info.keys }}k</span>
-                </label>
+                <input type="checkbox" :checked="throwMap.has(info.keys)" :disabled="!info.valid"
+                  @change="toggleKey(info.keys)" />
+                <span class="tc-keys">{{ info.keys }}k</span>
                 <input type="number" class="tc-input" :value="throwMap.get(info.keys) ?? ''"
                   :disabled="!throwMap.has(info.keys) || !info.valid"
                   @input="e => throwMap.set(info.keys, Number((e.target as HTMLInputElement).value))" placeholder="-"
                   min="1" />
                 <span class="tc-orig">{{ info.valid ? `原: ${getModeThrow(info)}` : '不合规' }}</span>
-              </div>
+              </label>
             </div>
           </div>
           <span class="field-hint">勾选键数并输入目标投长度。</span>
@@ -205,6 +203,7 @@ const workMode = ref<'lazer' | 'stable'>('lazer')
 
 // Recompute throwMap defaults when mode changes
 watch(workMode, () => {
+  addLog(`切换模式: ${workMode.value === 'lazer' ? 'Lazer' : 'Stable'}`, 'info')
   if (skinInfo.value.length === 0) return
   for (const [k] of throwMap) {
     const s = skinInfo.value.find(i => i.keys === k)
@@ -212,6 +211,11 @@ watch(workMode, () => {
       const def = getModeThrow(s)
       throwMap.set(k, typeof def === 'number' ? def : s.current_throw)
     }
+  }
+  // 切到 Lazer 时若投长度未计算则触发计算
+  if (workMode.value === 'lazer') {
+    const needCompute = skinInfo.value.some(s => s.valid && s.lazer_throw === 0)
+    if (needCompute) computeAllThrows()
   }
 })
 
@@ -273,11 +277,14 @@ const uniqueKeyInfos = computed(() => {
 })
 
 const canModify = computed(() => {
-  if (!filePath.value) return false
-  if (modifying.value) return false
-  if (throwMap.size === 0) return false
-  for (const v of throwMap.values()) { if (!v || v < 1) return false }
-  return true
+  if (!filePath.value || modifying.value) return false
+  // Key/KeyD 修复：至少勾选一项
+  if (keydChecked.size > 0) return true
+  // 预设替换：至少一项分配了预设
+  if (presetCount.value > 0) return true
+  // 修改投长度：至少一项有效
+  for (const v of throwMap.values()) { if (v && v >= 1) return true }
+  return false
 })
 
 function toggleKey(k: number) {
@@ -302,7 +309,13 @@ async function handleBrowse() {
   try {
     const selected = await open({ multiple: false, directory: true })
     if (selected) {
-      filePath.value = Array.isArray(selected) ? selected[0] : selected
+      const path = Array.isArray(selected) ? selected[0] : selected
+      const valid = await invoke('check_skin_ini', { folderPath: path })
+      if (!valid) {
+        addLog(`✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录`, 'error')
+        return
+      }
+      filePath.value = path
       addLog(`已选择：${filePath.value}`, 'info')
       await loadAll()
     }
@@ -444,6 +457,14 @@ async function computeAllThrows() {
     }
   }
   addLog('投长度计算完成', 'success')
+
+  // 同步已勾选的 throwMap：计算前勾选的键数存的是 fallback 值，需更新为真实 lazer 值
+  for (const [k] of throwMap) {
+    const s = skinInfo.value.find(i => i.keys === k)
+    if (s?.valid && s.lazer_throw > 0) {
+      throwMap.set(k, s.lazer_throw)
+    }
+  }
 }
 
 function openPresetDialog(stem: string) {
@@ -492,6 +513,16 @@ async function handleModify() {
     }
     if (result.success) {
       addLog('修改完成！', 'success')
+      // 重新加载投长度信息
+      await loadThrowInfo()
+      // 同步已勾选键数的 throwMap
+      for (const [k] of throwMap) {
+        const s = skinInfo.value.find(i => i.keys === k)
+        if (s?.valid) {
+          const def = getModeThrow(s)
+          throwMap.set(k, typeof def === 'number' ? def : s.current_throw)
+        }
+      }
     } else {
       addLog(`修改失败: ${result.message}`, 'error')
     }
@@ -713,7 +744,7 @@ async function handleModify() {
 }
 
 .repair-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 2px;
 }
 
@@ -795,7 +826,7 @@ async function handleModify() {
 }
 
 .preset-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 2px;
 }
 
@@ -925,7 +956,7 @@ async function handleModify() {
 }
 
 .throw-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 2px;
 }
 
@@ -944,6 +975,8 @@ async function handleModify() {
   border: 1px solid var(--border-color);
   border-radius: 6px;
   transition: all 0.15s;
+  min-width: 0;
+  cursor: pointer;
 }
 
 .throw-card.active {
@@ -955,19 +988,12 @@ async function handleModify() {
   opacity: 0.5;
 }
 
-.tc-check {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.tc-check input {
+.throw-card > input[type="checkbox"] {
   accent-color: var(--accent-purple);
   margin: 0;
   width: 12px;
   height: 12px;
+  flex-shrink: 0;
 }
 
 .tc-keys {
@@ -1010,10 +1036,12 @@ async function handleModify() {
 .tc-orig {
   font-size: 9px;
   color: var(--text-muted);
-  flex-shrink: 0;
+  flex-shrink: 1;
   white-space: nowrap;
-  min-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: right;
+  user-select: none;
 }
 
 /* Modal */

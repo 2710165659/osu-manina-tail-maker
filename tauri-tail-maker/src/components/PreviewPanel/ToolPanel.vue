@@ -41,9 +41,9 @@
         <!-- 内容区域 - 固定高度 -->
         <main class="tool-body">
           <Transition name="tool-switch" mode="out-in">
-            <SkinAdapter v-if="activeTab === 'skinAdapter'" key="skinAdapter" />
+            <BatchGenerate v-if="activeTab === 'batchGenerate'" key="batchGenerate" />
+            <SkinAdapter v-else-if="activeTab === 'skinAdapter'" key="skinAdapter" />
             <OneClickLength v-else-if="activeTab === 'oneClickLength'" key="oneClickLength" />
-            <BatchGenerate v-else-if="activeTab === 'batchGenerate'" key="batchGenerate" />
             <AddScript v-else-if="activeTab === 'addScript'" key="addScript" />
             <SkinValidator v-else-if="activeTab === 'skinValidator'" key="skinValidator" />
           </Transition>
@@ -63,9 +63,13 @@ import SkinValidator from '../ToolPanel/SkinValidator.vue'
 
 const emit = defineEmits<{ close: [] }>()
 
-const activeTab = ref('skinAdapter')
+const activeTab = ref('batchGenerate')
 
 const tabs = [
+  {
+    id: 'batchGenerate',
+    label: '批量生成图片',
+  },
   {
     id: 'skinAdapter',
     label: 'lazer皮肤适配',
@@ -73,10 +77,6 @@ const tabs = [
   {
     id: 'oneClickLength',
     label: '一键修改面尾',
-  },
-  {
-    id: 'batchGenerate',
-    label: '批量生成图片',
   },
   {
     id: 'addScript',

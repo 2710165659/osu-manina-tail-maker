@@ -107,7 +107,13 @@ async function handleBrowse() {
   try {
     const selected = await open({ multiple: false, directory: true })
     if (selected) {
-      filePath.value = Array.isArray(selected) ? selected[0] : selected
+      const path = Array.isArray(selected) ? selected[0] : selected
+      const valid = await invoke('check_skin_ini', { folderPath: path })
+      if (!valid) {
+        addLog(`✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录`, 'error')
+        return
+      }
+      filePath.value = path
       addLog(`已选择：${filePath.value}`, 'info')
       await loadRepairInfo()
     }

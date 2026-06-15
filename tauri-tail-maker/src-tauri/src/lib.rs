@@ -48,6 +48,7 @@ pub fn run() {
             convert_tail_toolbox,
             load_presets,
             validate_skin_files_cmd,
+            check_skin_ini,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

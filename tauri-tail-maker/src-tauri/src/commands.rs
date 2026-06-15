@@ -153,31 +153,7 @@ pub async fn render_preset_thumbnail(config: TailConfig) -> Result<String, Strin
         }
 
         let preview = renderer::render_preview(&config);
-        let (w, h) = (preview.width(), preview.height());
-
-        let mut first_row = 0u32;
-        'outer: for y in 0..h {
-            for x in 0..w {
-                if preview.get_pixel(x, y)[3] > 0 {
-                    first_row = y;
-                    break 'outer;
-                }
-            }
-        }
-
-        let pad_top: u32 = 50;
-        let pad_bottom: u32 = 200;
-        let crop_top = first_row.saturating_sub(pad_top);
-        let crop_bottom = (first_row + pad_bottom).min(h);
-        let crop_h = crop_bottom.saturating_sub(crop_top);
-
-        let cropped: image::RgbaImage = if crop_h > 0 {
-            ImageBuffer::from_fn(w, crop_h, |x, y| {
-                *preview.get_pixel(x, crop_top + y)
-            })
-        } else {
-            ImageBuffer::from_pixel(w, 1, image::Rgba([0, 0, 0, 0]))
-        };
+        let cropped = shared::image_utils::crop_preset_thumbnail(&preview);
 
         let mut png_bytes = Vec::new();
         let mut cursor = Cursor::new(&mut png_bytes);
@@ -246,7 +222,7 @@ pub async fn get_image_preview_top(image_path: String) -> Result<String, String>
         let (w, h) = rgba.dimensions();
 
         let crop_h = h.min(500);
-        let cropped = image::ImageBuffer::from_fn(w, crop_h, |x, y| {
+        let cropped = ImageBuffer::from_fn(w, crop_h, |x, y| {
             *rgba.get_pixel(x, y)
         });
 
@@ -703,31 +679,9 @@ fn render_preset_thumbnail_sync(config: &TailConfig) -> String {
         }
     }
 
-    // 渲染
+    // 渲染全尺寸预览 → 裁剪缩略图
     let preview = renderer::render_preview(config);
-    let (w, h) = (preview.width(), preview.height());
-
-    let mut first_row = 0u32;
-    'outer: for y in 0..h {
-        for x in 0..w {
-            if preview.get_pixel(x, y)[3] > 0 {
-                first_row = y;
-                break 'outer;
-            }
-        }
-    }
-
-    let pad_top: u32 = 50;
-    let pad_bottom: u32 = 200;
-    let crop_top = first_row.saturating_sub(pad_top);
-    let crop_bottom = (first_row + pad_bottom).min(h);
-    let crop_h = crop_bottom.saturating_sub(crop_top);
-
-    let cropped: image::RgbaImage = if crop_h > 0 {
-        ImageBuffer::from_fn(w, crop_h, |x, y| *preview.get_pixel(x, crop_top + y))
-    } else {
-        ImageBuffer::from_pixel(w, 1, image::Rgba([0, 0, 0, 0]))
-    };
+    let cropped = shared::image_utils::crop_preset_thumbnail(&preview);
 
     let mut png_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut png_bytes);
@@ -773,4 +727,14 @@ pub async fn validate_skin_files_cmd(folder_path: String) -> Result<Vec<String>,
             Ok(log)
         }
     }).await.map_err(|e| format!("任务执行失败: {}", e))?
+}
+
+/// 校验文件夹是否为有效皮肤目录（包含 skin.ini）
+#[tauri::command]
+pub fn check_skin_ini(folder_path: String) -> Result<bool, String> {
+    let dir = PathBuf::from(&folder_path);
+    if !dir.is_dir() {
+        return Ok(false);
+    }
+    Ok(dir.join("skin.ini").is_file())
 }
