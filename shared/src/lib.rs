@@ -2,13 +2,14 @@ pub mod backup;
 pub mod image_utils;
 pub mod keyd_repair;
 pub mod lazer_repair;
-pub mod osk_ops;
+pub mod logger;
 pub mod preset_loader;
 pub mod skin_finder;
 pub mod skin_ini;
 pub mod skin_validator;
 pub mod tail_repair;
 pub mod tail_toolbox;
+pub mod throw_cache;
 pub mod throw_info;
 pub mod throw_length;
 

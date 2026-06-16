@@ -30,6 +30,10 @@ pub fn execute_toolbox(
     backup_dir: &Path,
 ) -> Result<Vec<String>, String> {
     let mut log: Vec<String> = Vec::new();
+    fn push_log(log: &mut Vec<String>, msg: &str) {
+        log.push(msg.to_string());
+        crate::logger::log_info("toolbox", msg);
+    }
     let ts_dir = backup::backup_timestamp();
 
     let throw_map: HashMap<u32, u32> = throws.iter().cloned().collect();
@@ -37,7 +41,7 @@ pub fn execute_toolbox(
 
     // ---------- Step 1: Key/KeyD 修复（仅 lazer） ----------
     if work_mode == "lazer" && !keyd_stems.is_empty() {
-        log.push("--- Key/KeyD 修复 ---".to_string());
+        push_log(&mut log, "--- Key/KeyD 修复 ---");
         match lazer_repair::execute_lazer_key_repair_filtered(
             skin_dir,
             backup_dir,
@@ -45,13 +49,13 @@ pub fn execute_toolbox(
             &ts_dir,
         ) {
             Ok(key_log) => log.extend(key_log),
-            Err(e) => log.push(format!("Key 修复失败: {}", e)),
+            Err(e) => push_log(&mut log, &format!("Key 修复失败: {}", e)),
         }
     }
 
     // ---------- Step 2: 预设替换 ----------
     if !presets.is_empty() {
-        log.push("--- 用预设替换现有图片 ---".to_string());
+        push_log(&mut log, "--- 用预设替换现有图片 ---");
         let preset_map: HashMap<&str, &str> = presets
             .iter()
             .map(|(s, p)| (s.as_str(), p.as_str()))
@@ -60,7 +64,7 @@ pub fn execute_toolbox(
     }
 
     // ---------- Step 3: 修改投长度 ----------
-    log.push("--- 修改投长度 ---".to_string());
+    push_log(&mut log, "--- 修改投长度 ---");
 
     // 收集 ColumnWidth 映射
     let ini_path = skin_dir.join("skin.ini");
@@ -83,7 +87,7 @@ pub fn execute_toolbox(
         Err(e) => return Err(format!("投长度修改失败: {}", e)),
     }
 
-    log.push("全部完成！".to_string());
+    push_log(&mut log, "全部完成！");
     Ok(log)
 }
 
@@ -120,7 +124,9 @@ fn apply_presets_by_stem(
             let image_path = match skin_ini::find_image_file(skin_dir, &r.name) {
                 Some(p) => p,
                 None => {
-                    log.push(format!("⚠ 找不到面尾图片: {}", r.name));
+                    let msg = format!("⚠ 找不到面尾图片: {}", r.name);
+                    log.push(msg.clone());
+                    crate::logger::log_warn("toolbox", &msg);
                     continue;
                 }
             };
@@ -129,7 +135,9 @@ fn apply_presets_by_stem(
                 .save(&image_path)
                 .map_err(|e| format!("保存预设图片失败 {}: {}", r.name, e))?;
 
-            log.push(format!("  ✓ {} ← {}", r.name, preset_name));
+            let msg = format!("  ✓ {} ← {}", r.name, preset_name);
+            log.push(msg.clone());
+            crate::logger::log_info("toolbox", &msg);
         }
     }
 

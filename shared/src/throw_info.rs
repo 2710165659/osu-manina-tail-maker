@@ -6,7 +6,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::{backup, image_utils, skin_ini, throw_length};
+use crate::{backup, image_utils, skin_ini, throw_cache, throw_length};
 
 /// 投长度信息
 #[derive(Debug, Serialize, Clone)]
@@ -195,19 +195,35 @@ pub fn get_throw_info(skin_dir: &Path) -> Result<Vec<SkinThrowInfo>, String> {
 
             let is_2x = image_utils::is_2x(&image_path);
 
-            // 只做快速 stable 计算，lazer_throw 后续按需计算
+            // 尝试从缓存读取（按文件 hash 索引，跨目录复用）
+            let cache_key = throw_cache::hash_file(&image_path).ok();
+            let cached = cache_key.as_deref().and_then(throw_cache::get);
+
             match image::open(&image_path) {
                 Ok(img) => {
                     let rgba = img.to_rgba8();
                     let (valid, height) = throw_length::validate_tail_image(&rgba);
-                    let current_throw = throw_length::compute_throw_stable(&rgba, section.column_width);
+                    let current_throw = if let Some(ref c) = cached {
+                        c.stable_throw
+                    } else {
+                        let t = throw_length::compute_throw_stable(&rgba, section.column_width);
+                        // 首次计算 stable 时写入缓存（lazer 填 0 占位，后续更新）
+                        if let Some(ref k) = cache_key {
+                            throw_cache::set(k, &throw_cache::ThrowCacheEntry {
+                                stable_throw: t,
+                                lazer_throw: 0,
+                            });
+                        }
+                        t
+                    };
+                    let lazer_throw = cached.as_ref().map_or(0, |c| c.lazer_throw);
 
                     results.push(SkinThrowInfo {
                         keys: section.keys,
                         stem: stem.clone(),
                         column_width: section.column_width,
                         current_throw,
-                        lazer_throw: 0, // 后续通过 compute_lazer_throw 按需计算
+                        lazer_throw,
                         height,
                         valid,
                         is_2x,
@@ -232,77 +248,67 @@ pub fn get_throw_info(skin_dir: &Path) -> Result<Vec<SkinThrowInfo>, String> {
     Ok(results)
 }
 
-/// 按需计算指定 stems 的 lazer 投长度。
+/// 按需计算指定 stems 的 lazer 投长度（优先从缓存读取，未命中则计算并写缓存）。
 ///
-/// 遍历 skin.ini，对请求的 stems 应用 repair_tail_image 后计算投长度。
 /// 返回 (stem, lazer_throw) 的列表。
 pub fn compute_lazer_throws(
     skin_dir: &Path,
     stems: &[String],
 ) -> Result<Vec<(String, u32)>, String> {
-    let ini_path = skin_dir.join("skin.ini");
-    if !ini_path.exists() {
-        return Err("未找到 skin.ini 文件".to_string());
-    }
-    let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
-    let stem_set: HashSet<&str> = stems.iter().map(|s| s.as_str()).collect();
     let mut results: Vec<(String, u32)> = Vec::new();
+    let mut seen = HashSet::new();
 
-    for section in &skin_ini.mania_sections {
-        for r in &section.note_image_ls {
-            if !stem_set.contains(r.name.as_str()) {
-                continue;
-            }
-            if results.iter().any(|(s, _)| s == &r.name) {
-                continue;
-            }
-
-            let image_path = match skin_ini::find_image_file(skin_dir, &r.name) {
-                Some(p) => p,
-                None => continue,
-            };
-
-            if let Ok(img) = image::open(&image_path) {
-                let rgba = img.to_rgba8();
-                let (valid, _) = throw_length::validate_tail_image(&rgba);
-                let lazer_throw = if valid {
-                    throw_length::compute_throw_lazer(&rgba, section.column_width)
-                } else {
-                    0
-                };
-                results.push((r.name.clone(), lazer_throw));
-            }
+    for stem in stems {
+        if !seen.insert(stem.clone()) {
+            continue;
         }
+        let t = compute_lazer_throw_single(skin_dir, stem, 0);
+        results.push((stem.clone(), t));
     }
 
     Ok(results)
 }
 
-/// 计算单个 stem 在指定 ColumnWidth 下的 lazer 投长度。
+/// 计算单个 stem 的 lazer 投长度（column_width 仅 API 兼容，实际不影响结果）。
 ///
-/// 在前端逐 key 异步调用，每个 key 传入自己的 column_width。
+/// 优先从缓存读取，未命中则计算并写入缓存。
 /// 返回 lazer_throw（px），失败返回 0。
 pub fn compute_lazer_throw_single(
     skin_dir: &Path,
     stem: &str,
-    column_width: u32,
+    _column_width: u32,
 ) -> u32 {
     let image_path = match skin_ini::find_image_file(skin_dir, stem) {
         Some(p) => p,
         None => return 0,
     };
-    match image::open(&image_path) {
-        Ok(img) => {
+
+    // 查缓存
+    if let Ok(cache_key) = throw_cache::hash_file(&image_path) {
+        if let Some(cached) = throw_cache::get(&cache_key) {
+            if cached.lazer_throw > 0 {
+                return cached.lazer_throw;
+            }
+        }
+        // 计算
+        if let Ok(img) = image::open(&image_path) {
             let rgba = img.to_rgba8();
             let (valid, _) = throw_length::validate_tail_image(&rgba);
             if valid {
-                throw_length::compute_throw_lazer(&rgba, column_width)
-            } else {
-                0
+                let t = throw_length::compute_throw_lazer(&rgba, 0);
+                // 写缓存：保留已有 stable_throw，更新 lazer_throw
+                let stable = throw_cache::get(&cache_key)
+                    .map_or(0, |c| c.stable_throw);
+                throw_cache::set(&cache_key, &throw_cache::ThrowCacheEntry {
+                    stable_throw: stable,
+                    lazer_throw: t,
+                });
+                return t;
             }
         }
-        Err(_) => 0,
     }
+
+    0
 }
 
 /// 执行投长度修改。
@@ -330,7 +336,10 @@ pub fn execute_throw_modification(
 
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
     let mut log: Vec<String> = Vec::new();
-    let add_log = |log: &mut Vec<String>, msg: &str| log.push(msg.to_string());
+    let add_log = |log: &mut Vec<String>, msg: &str| {
+        log.push(msg.to_string());
+        crate::logger::log_info("throw", msg);
+    };
 
     let mut seen = HashSet::new();
     let mut processed = false;
@@ -417,22 +426,3 @@ pub fn execute_throw_modification(
     Ok(log)
 }
 
-/// 获取尾部预览图（顶部 500px），返回 base64 PNG。
-/// 使用流式读取，只解码头部必要的行。
-pub fn get_tail_preview_base64(skin_dir: &Path, stem: &str) -> Result<String, String> {
-    let image_path = skin_ini::find_image_file(skin_dir, stem)
-        .ok_or_else(|| format!("找不到面尾图片: {}", stem))?;
-
-    // 流式读取顶部 500 行
-    let cropped = image_utils::read_top_rows_streaming(&image_path, 500)?;
-
-    use std::io::Cursor;
-    let mut png_bytes = Vec::new();
-    let mut cursor = Cursor::new(&mut png_bytes);
-    image::DynamicImage::ImageRgba8(cropped)
-        .write_to(&mut cursor, image::ImageFormat::Png)
-        .map_err(|e| format!("PNG 编码失败: {}", e))?;
-
-    use base64::Engine;
-    Ok(base64::engine::general_purpose::STANDARD.encode(&png_bytes))
-}

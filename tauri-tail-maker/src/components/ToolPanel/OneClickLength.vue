@@ -163,33 +163,15 @@
     </div>
 
     <!-- 日志 -->
-    <div class="log-section">
-      <div class="log-header">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.1" />
-          <path d="M3.5 4h5M3.5 6h3M3.5 8h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
-        </svg>
-        <span>日志</span>
-      </div>
-      <div class="log-content" ref="logContainer">
-        <template v-if="logs.length === 0">
-          <div class="log-empty"><span class="log-empty-icon">~</span><span>等待操作...</span></div>
-        </template>
-        <template v-else>
-          <div v-for="(log, i) in logs" :key="i" :class="['log-line', log.type]">
-            <span class="log-time">{{ log.time }}</span>
-            <span class="log-marker">›</span>
-            <span class="log-msg">{{ log.message }}</span>
-          </div>
-        </template>
-      </div>
-    </div>
+    <LogPanel :logs="logs" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
+import { useToolLogger } from '../../composables/useToolLogger'
+import LogPanel from '../shared/LogPanel.vue'
 
 function presetSrc(path: string): string {
   return path.startsWith('data:') ? path : convertFileSrc(path)
@@ -203,7 +185,7 @@ const workMode = ref<'lazer' | 'stable'>('lazer')
 
 // Recompute throwMap defaults when mode changes
 watch(workMode, () => {
-  addLog(`切换模式: ${workMode.value === 'lazer' ? 'Lazer' : 'Stable'}`, 'info')
+  push(`切换模式: ${workMode.value === 'lazer' ? 'Lazer' : 'Stable'}`, 'info')
   if (skinInfo.value.length === 0) return
   for (const [k] of throwMap) {
     const s = skinInfo.value.find(i => i.keys === k)
@@ -215,7 +197,10 @@ watch(workMode, () => {
   // 切到 Lazer 时若投长度未计算则触发计算
   if (workMode.value === 'lazer') {
     const needCompute = skinInfo.value.some(s => s.valid && s.lazer_throw === 0)
-    if (needCompute) computeAllThrows()
+    if (needCompute) {
+      computingThrows.value = true
+      invoke('compute_all_lazer_throws', { folderPath: filePath.value })
+    }
   }
 })
 
@@ -260,9 +245,27 @@ const presetDialogStem = ref<string | null>(null)
 
 // Log
 const modifying = ref(false)
-const logContainer = ref<HTMLDivElement>()
-interface LogEntry { time: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }
-const logs = ref<LogEntry[]>([])
+const { logs, push } = useToolLogger({
+  target: ['toolbox', 'repair', 'throw', 'validator', 'frontend'],
+  onData: (target, data) => {
+    const d = data as { stem?: string; lazer_throw?: number; done?: boolean }
+    if (target === 'throw') {
+      if (d.stem && d.lazer_throw !== undefined) {
+        for (const x of skinInfo.value) {
+          if (x.stem === d.stem) x.lazer_throw = d.lazer_throw
+        }
+      }
+      if (d.done) {
+        computingThrows.value = false
+        for (const [k] of throwMap) {
+          const s = skinInfo.value.find(i => i.keys === k)
+          if (s?.valid && s.lazer_throw > 0) throwMap.set(k, s.lazer_throw)
+        }
+      }
+    }
+  },
+  onError: () => { modifying.value = false },
+})
 
 // Computed
 const presetCount = computed(() => Object.values(stemPresets).filter(Boolean).length)
@@ -297,13 +300,6 @@ function toggleKey(k: number) {
   }
 }
 
-function addLog(msg: string, type: LogEntry['type'] = 'info') {
-  const now = new Date()
-  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
-  logs.value.push({ time, message: msg, type })
-  nextTick(() => { if (logContainer.value) logContainer.value.scrollTop = logContainer.value.scrollHeight })
-}
-
 async function handleBrowse() {
   const { open } = await import('@tauri-apps/plugin-dialog')
   try {
@@ -312,22 +308,21 @@ async function handleBrowse() {
       const path = Array.isArray(selected) ? selected[0] : selected
       const valid = await invoke('check_skin_ini', { folderPath: path })
       if (!valid) {
-        addLog(`✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录`, 'error')
+        push(`✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录`, 'error')
         return
       }
       filePath.value = path
-      addLog(`已选择：${filePath.value}`, 'info')
+      push(`已选择：${path}`, 'info')
       await loadAll()
     }
   } catch (e) {
-    addLog(`文件选择失败：${e}`, 'error')
+    push(`文件选择失败：${e}`, 'error')
   }
 }
 
 async function loadAll() {
   loadingInfo.value = true
   throwMap.clear()
-  throwCache.clear()
   Object.keys(stemPresets).forEach(k => delete stemPresets[k])
   keydChecked.clear()
   keydInfos.value = []
@@ -345,125 +340,53 @@ async function loadAll() {
   loadingInfo.value = false
 }
 
-// Throw cache: key = stem → Promise<number> (column_width does not affect throw length)
-const throwCache = new Map<string, Promise<number>>()
+// ── 数据加载 ──
 
 async function loadKeydList() {
   if (workMode.value !== 'lazer') return
-  addLog('=== 检测 Key、KeyD ===', 'info')
   try {
     const kd: KeydStemInfo[] = await invoke('get_keyd_list', { folderPath: filePath.value })
     keydInfos.value = kd
-    addLog(`已加载 ${kd.length} 个 Key/KeyD 图片`, 'success')
-  } catch (e) { addLog(`Key/KeyD 列表加载失败: ${e}`, 'warning'); keydInfos.value = [] }
+    push(`已加载 ${kd.length} 个 Key/KeyD 图片`, 'success')
+  } catch (e) { push(`Key/KeyD 列表加载失败: ${e}`, 'error'); keydInfos.value = [] }
 }
 
 async function loadPresetList() {
-  addLog('=== 加载预设 ===', 'info')
   try {
     const ik: ImageKeyInfo[] = await invoke('get_image_key_info', { folderPath: filePath.value })
     imageKeyInfos.value = ik
-    addLog(`已加载 ${ik.length} 个图片关联`, 'info')
-  } catch (e) { addLog(`图片关联加载失败: ${e}`, 'warning'); imageKeyInfos.value = [] }
+    push(`已加载 ${ik.length} 个图片关联`, 'info')
+  } catch (e) { push(`图片关联加载失败: ${e}`, 'error'); imageKeyInfos.value = [] }
 
   try {
     const p: PresetInfo[] = await invoke('load_presets', { skinRoot: filePath.value })
     presets.value = p
-    if (p.length > 0) addLog(`已加载 ${p.length} 个预设`, 'success')
-    else addLog('未找到预设图片', 'info')
-  } catch (e) { addLog(`预设加载失败: ${e}`, 'warning') }
+    if (p.length > 0) push(`已加载 ${p.length} 个预设`, 'success')
+    else push('未找到预设图片', 'info')
+  } catch (e) { push(`预设加载失败: ${e}`, 'error') }
 }
 
 async function loadThrowInfo() {
-  addLog('=== 计算投长度 ===', 'info')
+  push('加载投长度信息...', 'info')
   try {
     const info: SkinThrowInfo[] = await invoke('get_skin_throw_info', { folderPath: filePath.value })
     skinInfo.value = info
-    addLog('皮肤信息读取完成', 'success')
 
     const keySet = new Set(info.map(s => s.keys))
     const keys = [...keySet].sort((a, b) => a - b)
 
-    if (keys.length > 0) {
-      addLog(`检测到键数: ${keys.map(k => k + 'k').join(', ')}`, 'info')
-      for (const s of info.filter(i => !i.valid)) {
-        addLog(`⚠ ${s.keys}k ${s.stem}: 高度 ${s.height}px，不满足 >5000，不可修改`, 'warning')
-      }
-    } else {
-      addLog('未找到任何 NoteImage#L 面尾定义', 'warning')
+    if (keys.length === 0) {
+      push('未找到任何 NoteImage#L 面尾定义', 'warning')
+      return
     }
 
-    await computeAllThrows()
+    // 后台并行计算所有 lazer 投长度（fire-and-forget，结果通过事件推送）
+    if (workMode.value === 'lazer') {
+      computingThrows.value = true
+      invoke('compute_all_lazer_throws', { folderPath: filePath.value })
+    }
   } catch (e) {
-    addLog(`读取皮肤信息失败：${e}`, 'error')
-  }
-}
-
-async function computeAllThrows() {
-  if (workMode.value !== 'lazer') return
-
-  // Dedup by stem only — column_width does not affect throw length
-  // (resize always targets 32800 height; vertical scan is width-independent)
-  const seenStems = new Set<string>()
-  const tasks: { stem: string; keys: string }[] = []
-
-  for (const s of skinInfo.value) {
-    if (!s.valid) continue
-    if (seenStems.has(s.stem)) continue
-    seenStems.add(s.stem)
-
-    const stem = s.stem
-    const keyList = [...new Set(skinInfo.value.filter(x => x.stem === stem).map(x => x.keys))]
-      .sort((a, b) => a - b).map(k => k + 'k').join(', ')
-
-    let promise = throwCache.get(stem)
-    if (!promise) {
-      addLog(`计算 ${stem} 投长度...`, 'info')
-      promise = invoke<number>('compute_lazer_throw_single', {
-        folderPath: filePath.value,
-        stem,
-        columnWidth: s.column_width,
-      })
-      throwCache.set(stem, promise)
-    }
-    tasks.push({ stem, keys: keyList })
-  }
-
-  if (tasks.length === 0) {
-    addLog('无需计算投长度', 'info')
-    return
-  }
-
-  computingThrows.value = true
-
-  // Run all computations in parallel
-  const results = await Promise.allSettled(
-    tasks.map(t => throwCache.get(t.stem)!)
-  )
-
-  computingThrows.value = false
-
-  for (let i = 0; i < tasks.length; i++) {
-    const t = tasks[i]
-    const r = results[i]
-    if (r.status === 'fulfilled') {
-      const lt = r.value
-      for (const x of skinInfo.value) {
-        if (x.stem === t.stem) x.lazer_throw = lt
-      }
-      addLog(`  ✓ ${t.stem} (${t.keys}) 投长度: ${lt}`, 'success')
-    } else {
-      addLog(`  ✗ ${t.stem} 投长度计算失败: ${r.reason}`, 'warning')
-    }
-  }
-  addLog('投长度计算完成', 'success')
-
-  // 同步已勾选的 throwMap：计算前勾选的键数存的是 fallback 值，需更新为真实 lazer 值
-  for (const [k] of throwMap) {
-    const s = skinInfo.value.find(i => i.keys === k)
-    if (s?.valid && s.lazer_throw > 0) {
-      throwMap.set(k, s.lazer_throw)
-    }
+    push(`读取皮肤信息失败：${e}`, 'error')
   }
 }
 
@@ -474,63 +397,41 @@ function openPresetDialog(stem: string) {
 function selectPreset(stem: string, preset: PresetInfo) {
   stemPresets[stem] = preset
   presetDialogStem.value = null
-  addLog(`${stem} 选择预设: ${preset.name}`, 'info')
 }
 
 async function handleModify() {
   if (!canModify.value) return
   modifying.value = true
 
-  addLog(`文件：${filePath.value}`, 'info')
-  addLog(`开始修改... 模式: ${workMode.value}`, 'info')
+  push(`开始一键修改面尾... 模式: ${workMode.value}`, 'info')
 
   const entries = [...throwMap.entries()].sort((a, b) => a[0] - b[0])
   const throws: [number, number][] = entries.map(([k, v]) => [k, v])
-
-  // Build presets: stem → preset_name
   const presetList: [string, string][] = Object.entries(stemPresets)
     .filter(([, v]) => v !== null && v !== undefined)
     .map(([stem, v]) => [stem, v!.name])
-
-  // Build keyd_stems
   const keydStems: string[] = [...keydChecked]
 
-  try {
-    const result: { success: boolean; message: string; logs: string[] } = await invoke('convert_tail_toolbox', {
-      folderPath: filePath.value,
-      skinMode: 'folder',
-      workMode: workMode.value,
-      throws,
-      presets: presetList,
-      keydStems,
-    })
-
-    for (const line of result.logs) {
-      const type: LogEntry['type'] = line.startsWith('  ✓') ? 'success'
-        : line.includes('⚠') || line.startsWith('  ✗') ? 'warning'
-          : 'info'
-      addLog(line, type)
-    }
+  // 同步 fire-and-forget：后端通过 app:event 流式推送日志
+  invoke<{ success: boolean; message: string }>('convert_tail_toolbox', {
+    folderPath: filePath.value,
+    skinMode: 'folder',
+    workMode: workMode.value,
+    throws,
+    presets: presetList,
+    keydStems,
+  }).then((result) => {
     if (result.success) {
-      addLog('修改完成！', 'success')
-      // 重新加载投长度信息
-      await loadThrowInfo()
-      // 同步已勾选键数的 throwMap
-      for (const [k] of throwMap) {
-        const s = skinInfo.value.find(i => i.keys === k)
-        if (s?.valid) {
-          const def = getModeThrow(s)
-          throwMap.set(k, typeof def === 'number' ? def : s.current_throw)
-        }
-      }
+      push('修改完成！', 'success')
+      loadThrowInfo()
     } else {
-      addLog(`修改失败: ${result.message}`, 'error')
+      push(`修改失败: ${result.message}`, 'error')
     }
-  } catch (e) {
-    addLog(`修改失败：${e}`, 'error')
-  } finally {
     modifying.value = false
-  }
+  }).catch((e) => {
+    push(`修改失败：${e}`, 'error')
+    modifying.value = false
+  })
 }
 </script>
 
@@ -1206,104 +1107,5 @@ async function handleModify() {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-/* Log */
-.log-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.log-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.log-header svg {
-  opacity: 0.6;
-}
-
-.log-content {
-  height: 160px;
-  overflow-y: auto;
-  padding: 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  line-height: 1.8;
-}
-
-.log-content::-webkit-scrollbar {
-  width: 4px;
-}
-
-.log-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.log-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-}
-
-.log-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.log-empty-icon {
-  color: var(--accent-purple);
-  opacity: 0.5;
-}
-
-.log-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.log-time {
-  color: var(--text-muted);
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.log-marker {
-  color: var(--accent-purple);
-  opacity: 0.4;
-  flex-shrink: 0;
-}
-
-.log-msg {
-  flex: 1;
-  word-break: break-all;
-}
-
-.log-line.info .log-msg {
-  color: var(--text-secondary);
-}
-
-.log-line.success .log-msg {
-  color: #44ee88;
-}
-
-.log-line.warning .log-msg {
-  color: #ffaa44;
-}
-
-.log-line.error .log-msg {
-  color: #ff4466;
 }
 </style>

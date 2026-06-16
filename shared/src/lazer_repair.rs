@@ -32,7 +32,10 @@ pub fn execute_lazer_tail_repair(
     }
 
     let mut log: Vec<String> = Vec::new();
-    let add_log = |log: &mut Vec<String>, msg: &str| log.push(msg.to_string());
+    let add_log = |log: &mut Vec<String>, msg: &str| {
+        log.push(msg.to_string());
+        crate::logger::log_info("repair", msg);
+    };
     let ts_dir = backup::backup_timestamp();
 
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
@@ -166,7 +169,10 @@ pub fn execute_lazer_key_repair(
     }
 
     let mut log: Vec<String> = Vec::new();
-    let add_log = |log: &mut Vec<String>, msg: &str| log.push(msg.to_string());
+    let add_log = |log: &mut Vec<String>, msg: &str| {
+        log.push(msg.to_string());
+        crate::logger::log_info("repair", msg);
+    };
     let ts_dir = backup::backup_timestamp();
 
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
@@ -348,7 +354,10 @@ pub fn execute_lazer_key_repair_filtered(
     }
 
     let mut log: Vec<String> = Vec::new();
-    let add_log = |log: &mut Vec<String>, msg: &str| log.push(msg.to_string());
+    let add_log = |log: &mut Vec<String>, msg: &str| {
+        log.push(msg.to_string());
+        crate::logger::log_info("repair", msg);
+    };
 
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
 

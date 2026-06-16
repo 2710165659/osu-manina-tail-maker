@@ -32,49 +32,22 @@
       </div>
     </div>
 
-    <div class="log-section">
-      <div class="log-header">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.1" />
-          <path d="M3.5 4h5M3.5 6h3M3.5 8h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
-        </svg>
-        <span>日志</span>
-      </div>
-      <div class="log-content" ref="logContainer">
-        <template v-if="logs.length === 0">
-          <div class="log-empty"><span class="log-empty-icon">~</span><span>等待操作...</span></div>
-        </template>
-        <template v-else>
-          <div v-for="(log, i) in logs" :key="i" :class="['log-line', log.type]">
-            <span class="log-time">{{ log.time }}</span>
-            <span class="log-marker">›</span>
-            <span class="log-msg">{{ log.message }}</span>
-          </div>
-        </template>
-      </div>
-    </div>
+    <LogPanel :logs="logs" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useToolLogger } from '../../composables/useToolLogger'
+import LogPanel from '../shared/LogPanel.vue'
 
 const folderPath = ref('')
 const validating = ref(false)
-const logContainer = ref<HTMLDivElement>()
+
+const { logs, push } = useToolLogger({ target: ['validator', 'frontend'] })
 
 const canValidate = computed(() => !!folderPath.value && !validating.value)
-
-interface LogEntry { time: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }
-const logs = ref<LogEntry[]>([])
-
-function addLog(msg: string, type: LogEntry['type'] = 'info') {
-  const now = new Date()
-  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
-  logs.value.push({ time, message: msg, type })
-  nextTick(() => { if (logContainer.value) logContainer.value.scrollTop = logContainer.value.scrollHeight })
-}
 
 async function handleBrowse() {
   const { open } = await import('@tauri-apps/plugin-dialog')
@@ -82,10 +55,10 @@ async function handleBrowse() {
     const selected = await open({ multiple: false, directory: true })
     if (selected) {
       folderPath.value = Array.isArray(selected) ? selected[0] : selected
-      addLog(`已选择：${folderPath.value}`, 'info')
+      push(`已选择：${folderPath.value}`, 'info')
     }
   } catch (e) {
-    addLog(`文件夹选择失败：${e}`, 'error')
+    push(`文件夹选择失败：${e}`, 'error')
   }
 }
 
@@ -93,20 +66,15 @@ async function handleValidate() {
   if (!canValidate.value) return
 
   validating.value = true
-  addLog('开始校验...', 'info')
-  addLog(`目录：${folderPath.value}`, 'info')
+  push('开始校验...', 'info')
 
   try {
-    const logLines: string[] = await invoke('validate_skin_files_cmd', {
+    await invoke('validate_skin_files_cmd', {
       folderPath: folderPath.value,
     })
-    for (const line of logLines) {
-      const type: LogEntry['type'] = line.includes('✗') ? 'warning' : line.includes('✓') ? 'success' : 'info'
-      addLog(line, type)
-    }
-    addLog('校验完成！', 'success')
+    push('校验完成！', 'success')
   } catch (e) {
-    addLog(`校验失败：${e}`, 'error')
+    push(`校验失败：${e}`, 'error')
   } finally {
     validating.value = false
   }
@@ -245,103 +213,5 @@ async function handleValidate() {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-.log-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.log-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.log-header svg {
-  opacity: 0.6;
-}
-
-.log-content {
-  height: 160px;
-  overflow-y: auto;
-  padding: 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  line-height: 1.8;
-}
-
-.log-content::-webkit-scrollbar {
-  width: 4px;
-}
-
-.log-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.log-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-}
-
-.log-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.log-empty-icon {
-  color: var(--accent-purple);
-  opacity: 0.5;
-}
-
-.log-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.log-time {
-  color: var(--text-muted);
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.log-marker {
-  color: var(--accent-purple);
-  opacity: 0.4;
-  flex-shrink: 0;
-}
-
-.log-msg {
-  flex: 1;
-  word-break: break-all;
-}
-
-.log-line.info .log-msg {
-  color: var(--text-secondary);
-}
-
-.log-line.success .log-msg {
-  color: #44ee88;
-}
-
-.log-line.warning .log-msg {
-  color: #ffaa44;
-}
-
-.log-line.error .log-msg {
-  color: #ff4466;
 }
 </style>

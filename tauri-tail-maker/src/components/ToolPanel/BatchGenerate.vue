@@ -86,44 +86,23 @@
           <svg v-if="!generating" width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
           </svg>
-          <span v-if="generating">生成中... ({{ currentProgress }}/{{ generatedCount * selectedPresetNames.size }})</span>
+          <span v-if="generating">生成中... ({{ currentProgress }}/{{ totalCount }})</span>
           <span v-else>开始批量生成</span>
         </button>
       </div>
     </div>
 
     <!-- 日志区域 -->
-    <div class="log-section">
-      <div class="log-header">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.1" />
-          <path d="M3.5 4h5M3.5 6h3M3.5 8h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
-        </svg>
-        <span>日志</span>
-      </div>
-      <div class="log-content" ref="logContainer">
-        <template v-if="logs.length === 0">
-          <div class="log-empty">
-            <span class="log-empty-icon">~</span>
-            <span>等待操作...</span>
-          </div>
-        </template>
-        <template v-else>
-          <div v-for="(log, index) in logs" :key="index" :class="['log-line', log.type]">
-            <span class="log-time">{{ log.time }}</span>
-            <span class="log-marker">›</span>
-            <span class="log-msg">{{ log.message }}</span>
-          </div>
-        </template>
-      </div>
-    </div>
+    <LogPanel :logs="logs" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useConfig } from '../../composables/useConfig'
+import { useToolLogger } from '../../composables/useToolLogger'
+import LogPanel from '../shared/LogPanel.vue'
 
 const { presets } = useConfig()
 
@@ -134,6 +113,7 @@ const endLength = ref(200)
 const outputFolder = ref('')
 const generating = ref(false)
 const currentProgress = ref(0)
+const totalCount = ref(0)
 
 function togglePreset(name: string) {
   if (selectedPresetNames.value.has(name)) {
@@ -143,15 +123,22 @@ function togglePreset(name: string) {
   }
 }
 
-const logContainer = ref<HTMLDivElement>()
+const { logs, push, clear } = useToolLogger({
+  target: 'batch',
+  onData: (_target, data) => {
+    const d = data as { index?: number; total?: number }
+    if (d.index !== undefined) currentProgress.value = d.index
+    if (d.total !== undefined) totalCount.value = d.total
+  },
+})
 
-interface LogEntry {
-  time: string
-  message: string
-  type: 'info' | 'success' | 'warning' | 'error'
-}
-
-const logs = ref<LogEntry[]>([])
+// 组件卸载时取消后端任务
+onUnmounted(() => {
+  if (generating.value) {
+    invoke('cancel_batch_export')
+    generating.value = false
+  }
+})
 
 // 计算有效终止长度（对齐到步长）
 const effectiveEndLength = computed(() => {
@@ -175,101 +162,69 @@ const canGenerate = computed(() => {
     startLength.value > 0 &&
     stepSize.value > 0 &&
     endLength.value >= startLength.value &&
-    outputFolder.value !== ''
+    outputFolder.value !== '' &&
+    !generating.value
   )
 })
-
-function addLog(message: string, type: LogEntry['type'] = 'info') {
-  const now = new Date()
-  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
-  logs.value.push({ time, message, type })
-  nextTick(() => {
-    if (logContainer.value) {
-      logContainer.value.scrollTop = logContainer.value.scrollHeight
-    }
-  })
-}
 
 async function handleBrowseFolder() {
   const { open } = await import('@tauri-apps/plugin-dialog')
   try {
-    const selected = await open({
-      multiple: false,
-      directory: true,
-    })
+    const selected = await open({ multiple: false, directory: true })
     if (selected) {
       const path = Array.isArray(selected) ? selected[0] : selected
       outputFolder.value = path
-      addLog(`已选择输出文件夹：${path}`, 'info')
+      push(`已选择输出文件夹：${path}`, 'info')
     }
   } catch (e) {
-    addLog(`文件夹选择失败：${e}`, 'error')
+    push(`文件夹选择失败：${e}`, 'error')
   }
 }
 
-async function handleGenerate() {
+function handleGenerate() {
   if (!canGenerate.value || generating.value) return
 
   generating.value = true
   currentProgress.value = 0
+  clear()
 
   const selectedPresets = presets.value.filter(p => selectedPresetNames.value.has(p.name))
   if (selectedPresets.length === 0) {
-    addLog('未找到选中的预设', 'error')
+    push('未找到选中的预设', 'error')
     generating.value = false
     return
   }
 
-  const totalPerPreset = generatedCount.value
-  const totalTasks = totalPerPreset * selectedPresets.length
-
-  addLog('开始批量生成任务...', 'info')
-  addLog(`使用预设：${selectedPresets.map(p => p.name).join('、')}`, 'info')
-  addLog(`长度范围：${startLength.value}px ~ ${effectiveEndLength.value}px，步长 ${stepSize.value}px`, 'info')
-  addLog(`每个预设生成 ${totalPerPreset} 张，共 ${totalTasks} 张`, 'info')
-  addLog(`输出文件夹：${outputFolder.value}`, 'info')
+  // 收集所有配置项
+  const configs: any[] = []
+  const filenames: string[] = []
+  const presetNames: string[] = selectedPresets.map(p => p.name)
 
   const lengths: number[] = []
   for (let len = startLength.value; len <= effectiveEndLength.value; len += stepSize.value) {
     lengths.push(len)
   }
 
-  let successCount = 0
-  let failCount = 0
-
   for (const preset of selectedPresets) {
-    addLog(`── 预设：${preset.name} ──`, 'info')
-
     for (const throwLength of lengths) {
-      currentProgress.value = successCount + failCount + 1
-
       const genConfig = JSON.parse(JSON.stringify(preset.config))
       genConfig.throwLength = throwLength
-
-      const baseName = genConfig.image.filename || 'mania-noteL'
-      const filename = `${baseName}_${throwLength}px.png`
-      const outputPath = `${outputFolder.value}\\${filename}`
-
-      try {
-        addLog(`[${currentProgress.value}/${totalTasks}] 正在生成 ${filename}...`, 'info')
-        await invoke('export_image', {
-          config: genConfig,
-          outputPath,
-        })
-        successCount++
-        addLog(`✓ ${filename} 生成成功`, 'success')
-      } catch (e) {
-        failCount++
-        addLog(`✗ ${filename} 生成失败：${e}`, 'error')
-      }
+      const filename = `${preset.name}_${throwLength}px.png`
+      configs.push(genConfig)
+      filenames.push(filename)
     }
   }
 
-  addLog('─'.repeat(30), 'info')
-  addLog(`批量生成完成！成功 ${successCount} 张，失败 ${failCount} 张`, successCount > 0 ? 'success' : 'error')
-
-  generating.value = false
-  currentProgress.value = 0
+  // 同步 fire-and-forget：后端通过 app:event 流式推送进度
+  invoke('batch_export_images', {
+    configs,
+    outputFolder: outputFolder.value,
+    filenames,
+    presetNames,
+  }).catch((e) => {
+    push(`批量导出启动失败：${e}`, 'error')
+    generating.value = false
+  })
 }
 </script>
 
@@ -577,104 +532,5 @@ async function handleGenerate() {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-/* Log Section */
-.log-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.log-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.log-header svg {
-  opacity: 0.6;
-}
-
-.log-content {
-  height: 160px;
-  overflow-y: auto;
-  padding: 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  line-height: 1.8;
-}
-
-.log-content::-webkit-scrollbar {
-  width: 4px;
-}
-
-.log-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.log-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-}
-
-.log-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.log-empty-icon {
-  color: var(--accent-purple);
-  opacity: 0.5;
-}
-
-.log-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.log-time {
-  color: var(--text-muted);
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.log-marker {
-  color: var(--accent-purple);
-  opacity: 0.4;
-  flex-shrink: 0;
-}
-
-.log-msg {
-  flex: 1;
-  word-break: break-all;
-}
-
-.log-line.info .log-msg {
-  color: var(--text-secondary);
-}
-
-.log-line.success .log-msg {
-  color: #44ee88;
-}
-
-.log-line.warning .log-msg {
-  color: #ffaa44;
-}
-
-.log-line.error .log-msg {
-  color: #ff4466;
 }
 </style>

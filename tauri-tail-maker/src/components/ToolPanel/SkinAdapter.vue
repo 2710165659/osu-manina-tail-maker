@@ -5,16 +5,13 @@
     </div>
 
     <div class="config-group">
-      <!-- 皮肤文件夹路径 -->
       <div class="field">
         <label class="field-label">皮肤文件夹</label>
         <div class="path-group">
           <div class="path-display">
             <svg class="path-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1.5 7.5v3.5a1 1 0 001 1h9a1 1 0 001-1V7.5" stroke="currentColor" stroke-width="1.1"
-                stroke-linecap="round" />
-              <path d="M7 1.5v6M4.5 5L7 7.5 9.5 5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"
-                stroke-linejoin="round" />
+              <path d="M1.5 7.5v3.5a1 1 0 001 1h9a1 1 0 001-1V7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+              <path d="M7 1.5v6M4.5 5L7 7.5 9.5 5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <span class="path-text" :class="{ placeholder: !filePath }">{{ filePath || '请选择皮肤所在文件夹' }}</span>
           </div>
@@ -22,10 +19,8 @@
         </div>
       </div>
 
-      <!-- 要修复的图片列表（3列网格） -->
       <div class="field">
-        <label class="field-label" v-if="filePath && repairStems.length > 0">要修复的图片 ({{ checkedCount }}/{{
-          repairStems.length }})</label>
+        <label class="field-label" v-if="filePath && repairStems.length > 0">要修复的图片 ({{ checkedCount }}/{{ repairStems.length }})</label>
         <template v-if="filePath && repairStems.length > 0">
           <span class="field-hint">共 {{ repairStems.length }} 张待修复图片</span>
           <div class="repair-scroll">
@@ -33,9 +28,7 @@
               <label v-for="item in repairStems" :key="item.stem" :class="['repair-item', { active: item.checked }]">
                 <input type="checkbox" v-model="item.checked" />
                 <span class="ri-stem">{{ item.stem }}</span>
-                <span
-                  :class="['ri-tag', item.kind === 'tail' ? 'ri-tail' : item.kind === 'keyd' ? 'ri-keyd' : 'ri-key']">{{
-                    item.kind === 'tail' ? '面尾' : item.kind === 'keyd' ? 'KeyD' : 'Key' }}</span>
+                <span :class="['ri-tag', item.kind === 'tail' ? 'ri-tail' : item.kind === 'keyd' ? 'ri-keyd' : 'ri-key']">{{ item.kind === 'tail' ? '面尾' : item.kind === 'keyd' ? 'KeyD' : 'Key' }}</span>
               </label>
             </div>
           </div>
@@ -52,33 +45,15 @@
       </div>
     </div>
 
-    <div class="log-section">
-      <div class="log-header">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.1" />
-          <path d="M3.5 4h5M3.5 6h3M3.5 8h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
-        </svg>
-        <span>日志</span>
-      </div>
-      <div class="log-content" ref="logContainer">
-        <template v-if="logs.length === 0">
-          <div class="log-empty"><span class="log-empty-icon">~</span><span>等待操作...</span></div>
-        </template>
-        <template v-else>
-          <div v-for="(log, i) in logs" :key="i" :class="['log-line', log.type]">
-            <span class="log-time">{{ log.time }}</span>
-            <span class="log-marker">›</span>
-            <span class="log-msg">{{ log.message }}</span>
-          </div>
-        </template>
-      </div>
-    </div>
+    <LogPanel :logs="logs" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useToolLogger } from '../../composables/useToolLogger'
+import LogPanel from '../shared/LogPanel.vue'
 
 const filePath = ref('')
 const loadingInfo = ref(false)
@@ -88,19 +63,51 @@ const repairStems = ref<RepairStemItem[]>([])
 
 const checkedCount = computed(() => repairStems.value.filter(s => s.checked).length)
 const repairing = ref(false)
-const logContainer = ref<HTMLDivElement>()
 
-interface LogEntry { time: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }
-const logs = ref<LogEntry[]>([])
+const seenStems = new Set<string>()
+
+const { logs, push, clear } = useToolLogger({
+  target: ['repair', 'frontend'],
+  onError: () => { repairing.value = false },
+  onData: (_target, data) => {
+    const d = data as { done?: boolean; kind?: string; items?: Record<string, unknown>[] }
+    if (d.done) {
+      loadingInfo.value = false
+      repairing.value = false
+      return
+    }
+    if (d.kind === 'tails' && d.items) {
+      for (const t of d.items as { stem: string }[]) {
+        if (!seenStems.has(t.stem)) {
+          seenStems.add(t.stem)
+          repairStems.value.push({ stem: t.stem, kind: 'tail', checked: true })
+        }
+      }
+    }
+    if (d.kind === 'keyds' && d.items) {
+      for (const kd of d.items as { stem: string; as_key: number[]; as_keyd: number[] }[]) {
+        if (kd.as_key.length > 0 && !seenStems.has(kd.stem)) {
+          seenStems.add(kd.stem)
+          repairStems.value.push({ stem: kd.stem, kind: 'key', checked: true })
+        }
+        if (kd.as_keyd.length > 0 && !seenStems.has(kd.stem)) {
+          seenStems.add(kd.stem)
+          repairStems.value.push({ stem: kd.stem, kind: 'keyd', checked: true })
+        }
+      }
+    }
+  },
+})
+
+// 组件卸载时取消后端任务
+onUnmounted(() => {
+  if (repairing.value) {
+    invoke('cancel_repair_skin_adapter')
+    repairing.value = false
+  }
+})
 
 const canRepair = computed(() => filePath.value && !repairing.value && checkedCount.value > 0)
-
-function addLog(msg: string, type: LogEntry['type'] = 'info') {
-  const now = new Date()
-  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
-  logs.value.push({ time, message: msg, type })
-  nextTick(() => { if (logContainer.value) logContainer.value.scrollTop = logContainer.value.scrollHeight })
-}
 
 async function handleBrowse() {
   const { open } = await import('@tauri-apps/plugin-dialog')
@@ -110,74 +117,42 @@ async function handleBrowse() {
       const path = Array.isArray(selected) ? selected[0] : selected
       const valid = await invoke('check_skin_ini', { folderPath: path })
       if (!valid) {
-        addLog(`✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录`, 'error')
+        push('✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录', 'error')
         return
       }
       filePath.value = path
-      addLog(`已选择：${filePath.value}`, 'info')
-      await loadRepairInfo()
+      push(`已选择：${path}`, 'info')
+      loadRepairInfo()
     }
-  } catch (e) { addLog(`文件选择失败：${e}`, 'error') }
+  } catch (e) { push(`文件选择失败：${e}`, 'error') }
 }
 
-async function loadRepairInfo() {
+function loadRepairInfo() {
   loadingInfo.value = true
   repairStems.value = []
-  addLog('正在读取皮肤信息...', 'info')
-  try {
-    const seen = new Set<string>()
-    // NoteImage#L (tail)
-    try {
-      const tails: { stem: string; image_path: string }[] = await invoke('get_image_key_info', { folderPath: filePath.value })
-      for (const t of tails) {
-        if (seen.has(t.stem)) continue
-        seen.add(t.stem)
-        repairStems.value.push({ stem: t.stem, kind: 'tail', checked: true })
-      }
-    } catch (e) { addLog(`面尾列表加载失败: ${e}`, 'warning') }
-    // Key + KeyD
-    try {
-      const kds: { stem: string; as_key: number[]; as_keyd: number[] }[] = await invoke('get_keyd_list', { folderPath: filePath.value })
-      for (const kd of kds) {
-        if (kd.as_key.length > 0 && !seen.has(kd.stem)) {
-          seen.add(kd.stem)
-          repairStems.value.push({ stem: kd.stem, kind: 'key', checked: true })
-        }
-        if (kd.as_keyd.length > 0 && !seen.has(kd.stem)) {
-          seen.add(kd.stem)
-          repairStems.value.push({ stem: kd.stem, kind: 'keyd', checked: true })
-        }
-      }
-    } catch (e) { addLog(`Key/KeyD 列表加载失败: ${e}`, 'warning') }
-    addLog(`已加载 ${repairStems.value.length} 个待修复图片`, 'success')
-  } catch (e) { addLog(`加载失败: ${e}`, 'error') }
-  finally { loadingInfo.value = false }
+  seenStems.clear()
+
+  // 同步 fire-and-forget：后端通过 app:event 流式推送扫描结果
+  invoke('scan_repair_info', {
+    folderPath: filePath.value,
+  }).catch((e) => {
+    push(`扫描启动失败：${e}`, 'error')
+    loadingInfo.value = false
+  })
 }
 
-function classifyLog(msg: string): LogEntry['type'] {
-  if (msg.startsWith('  ✓') || msg.includes('完成')) return 'success'
-  if (msg.includes('⚠') || msg.startsWith('  ✗')) return 'warning'
-  return 'info'
-}
-
-async function handleRepair() {
+function handleRepair() {
   if (!canRepair.value) return
   repairing.value = true
-  addLog(`文件：${filePath.value}`, 'info')
-  addLog('开始修复任务...', 'info')
+  clear()
 
-  try {
-    addLog('--- 面尾修复 ---', 'info')
-    const logLines1: string[] = await invoke('repair_lazer_tail_folder', { folderPath: filePath.value })
-    for (const line of logLines1) { addLog(line, classifyLog(line)) }
-
-    addLog('--- Key/KeyD 修复 ---', 'info')
-    const logLines2: string[] = await invoke('repair_key_image_folder', { folderPath: filePath.value, mode: 'all' })
-    for (const line of logLines2) { addLog(line, classifyLog(line)) }
-
-    addLog('全部修复任务完成！', 'success')
-  } catch (e) { addLog(`修复失败: ${e}`, 'error') }
-  finally { repairing.value = false }
+  // 同步 fire-and-forget：后端通过 app:event 流式推送进度
+  invoke('repair_skin_adapter', {
+    folderPath: filePath.value,
+  }).catch((e) => {
+    push(`修复启动失败：${e}`, 'error')
+    repairing.value = false
+  })
 }
 </script>
 
@@ -228,7 +203,6 @@ async function handleRepair() {
   padding-left: 2px;
 }
 
-/* Repair placeholder */
 .repair-placeholder {
   display: flex;
   align-items: center;
@@ -243,7 +217,6 @@ async function handleRepair() {
   background: var(--bg-panel);
 }
 
-/* Path */
 .path-group {
   display: flex;
   gap: 8px;
@@ -297,7 +270,6 @@ async function handleRepair() {
   color: var(--accent-purple);
 }
 
-/* Repair grid (3 per row, scrollable) */
 .repair-scroll {
   max-height: 320px;
   overflow-y: auto;
@@ -384,7 +356,6 @@ async function handleRepair() {
   color: #ffaa44;
 }
 
-/* Button */
 .btn {
   display: flex;
   align-items: center;
@@ -424,104 +395,5 @@ async function handleRepair() {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-/* Log */
-.log-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.log-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.log-header svg {
-  opacity: 0.6;
-}
-
-.log-content {
-  height: 160px;
-  overflow-y: auto;
-  padding: 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  line-height: 1.8;
-}
-
-.log-content::-webkit-scrollbar {
-  width: 4px;
-}
-
-.log-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.log-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-}
-
-.log-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.log-empty-icon {
-  color: var(--accent-purple);
-  opacity: 0.5;
-}
-
-.log-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.log-time {
-  color: var(--text-muted);
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.log-marker {
-  color: var(--accent-purple);
-  opacity: 0.4;
-  flex-shrink: 0;
-}
-
-.log-msg {
-  flex: 1;
-  word-break: break-all;
-}
-
-.log-line.info .log-msg {
-  color: var(--text-secondary);
-}
-
-.log-line.success .log-msg {
-  color: #44ee88;
-}
-
-.log-line.warning .log-msg {
-  color: #ffaa44;
-}
-
-.log-line.error .log-msg {
-  color: #ff4466;
 }
 </style>

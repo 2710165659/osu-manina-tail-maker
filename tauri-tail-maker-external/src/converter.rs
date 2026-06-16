@@ -29,6 +29,7 @@ pub struct ConvertResult {
 /// 转换命令
 #[tauri::command]
 pub fn convert_tail(config: ConvertConfig) -> ConvertResult {
+    shared::logger::log_info("toolbox", "外部工具开始一键修改面尾...");
     let skin_dir = PathBuf::from(&config.skin_root);
     if !skin_dir.is_dir() {
         return ConvertResult {

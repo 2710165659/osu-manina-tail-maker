@@ -45,12 +45,6 @@ async fn get_keyd_list(skin_root: String) -> Result<Vec<shared::throw_info::Keyd
     shared::throw_info::get_keyd_list(std::path::Path::new(&skin_root))
 }
 
-/// 获取尾部预览图 base64 — thin wrapper
-#[tauri::command]
-async fn get_tail_preview(skin_root: String, stem: String) -> Result<String, String> {
-    shared::throw_info::get_tail_preview_base64(std::path::Path::new(&skin_root), &stem)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -65,7 +59,6 @@ pub fn run() {
             compute_lazer_throws,
             get_image_key_info,
             get_keyd_list,
-            get_tail_preview,
             open_url,
             browse_folder,
         ])
