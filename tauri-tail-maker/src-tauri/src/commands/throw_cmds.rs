@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 use tauri::AppHandle;
+use tauri::Emitter;
 
 use crate::events;
 
@@ -41,11 +42,13 @@ pub async fn compute_all_lazer_throws(
 
     tauri::async_runtime::spawn_blocking(move || {
         let total = stems.len();
+        let mut results: Vec<serde_json::Value> = Vec::with_capacity(total);
         for stem in &stems {
             let t = shared::throw_info::compute_lazer_throw_single(&skin_dir, stem, 0);
-            events::emit_data(&app, "info", "throw", &format!("{} 投长度: {}", stem, t),
-                serde_json::json!({ "stem": stem, "lazer_throw": t }));
+            results.push(serde_json::json!({ "stem": stem, "lazer_throw": t }));
         }
+        // 批量推送结果（发到独立事件，不进入日志面板）
+        let _ = app.emit("app:throw-result", serde_json::json!({ "items": results }));
         events::emit_log(&app, "done", "throw", &format!("投长度计算完成（{} 个）", total));
     }).await.map_err(|e| format!("任务执行失败: {}", e))?;
 

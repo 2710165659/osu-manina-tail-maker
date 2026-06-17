@@ -168,8 +168,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { useToolLogger } from '../../composables/useToolLogger'
 import LogPanel from '../shared/LogPanel.vue'
 
@@ -245,12 +246,34 @@ const presetDialogStem = ref<string | null>(null)
 
 // Log
 const modifying = ref(false)
-const { logs, push } = useToolLogger({
+let _unsubThrow: (() => void) | null = null
+
+onMounted(async () => {
+  _unsubThrow = await listen<{ items: { stem: string; lazer_throw: number }[] }>('app:throw-result', (event) => {
+    for (const item of event.payload.items) {
+      for (const x of skinInfo.value) {
+        if (x.stem === item.stem) x.lazer_throw = item.lazer_throw
+      }
+    }
+  })
+})
+
+onUnmounted(() => {
+  if (_unsubThrow) _unsubThrow()
+})
+
+const { logs, push, clear } = useToolLogger({
   target: ['toolbox', 'repair', 'throw', 'validator', 'frontend'],
   onData: (target, data) => {
-    const d = data as { stem?: string; lazer_throw?: number; done?: boolean }
+    const d = data as { stem?: string; lazer_throw?: number; done?: boolean; items?: { stem: string; lazer_throw: number }[] }
     if (target === 'throw') {
-      if (d.stem && d.lazer_throw !== undefined) {
+      if (d.items) {
+        for (const item of d.items) {
+          for (const x of skinInfo.value) {
+            if (x.stem === item.stem) x.lazer_throw = item.lazer_throw
+          }
+        }
+      } else if (d.stem && d.lazer_throw !== undefined) {
         for (const x of skinInfo.value) {
           if (x.stem === d.stem) x.lazer_throw = d.lazer_throw
         }
@@ -262,6 +285,10 @@ const { logs, push } = useToolLogger({
           if (s?.valid && s.lazer_throw > 0) throwMap.set(k, s.lazer_throw)
         }
       }
+    }
+    if (target === 'toolbox' && d.done) {
+      modifying.value = false
+      loadThrowInfo()
     }
   },
   onError: () => { modifying.value = false },
@@ -399,9 +426,10 @@ function selectPreset(stem: string, preset: PresetInfo) {
   presetDialogStem.value = null
 }
 
-async function handleModify() {
+function handleModify() {
   if (!canModify.value) return
   modifying.value = true
+  clear()
 
   push(`开始一键修改面尾... 模式: ${workMode.value}`, 'info')
 
@@ -412,22 +440,14 @@ async function handleModify() {
     .map(([stem, v]) => [stem, v!.name])
   const keydStems: string[] = [...keydChecked]
 
-  // 同步 fire-and-forget：后端通过 app:event 流式推送日志
-  invoke<{ success: boolean; message: string }>('convert_tail_toolbox', {
+  // Fire-and-forget：后端通过 app:event target="toolbox" 流式推送每步进度
+  invoke('convert_tail_toolbox', {
     folderPath: filePath.value,
     skinMode: 'folder',
     workMode: workMode.value,
     throws,
     presets: presetList,
     keydStems,
-  }).then((result) => {
-    if (result.success) {
-      push('修改完成！', 'success')
-      loadThrowInfo()
-    } else {
-      push(`修改失败: ${result.message}`, 'error')
-    }
-    modifying.value = false
   }).catch((e) => {
     push(`修改失败：${e}`, 'error')
     modifying.value = false

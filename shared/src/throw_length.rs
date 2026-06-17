@@ -61,14 +61,11 @@ pub fn modify_throw_length_lazer(
     target_throw: u32,
     column_width: u32,
 ) -> RgbaImage {
-    let h = img.height();
-    if h == 0 { return RgbaImage::new(1, 1); }
-    // target_throw 是 Lazer 坐标系（32800 高度）的值，反算回原图高度
-    let original_target = ((target_throw as u64 * h as u64) / 32800) as u32;
-    // Step 1: stable 修改投长度（保持原图宽高）
-    let stable_result = modify_throw_length(img, original_target);
-    // Step 2: 拉伸到 lazer 规范（cw×1.6 宽，32800 高）
-    crate::tail_repair::repair_tail_image(&stable_result, column_width)
+    if img.height() == 0 { return RgbaImage::new(1, 1); }
+    // Step 1: 先拉伸到 lazer 规范（cw×1.6 宽，32800 高）
+    let scaled = crate::tail_repair::repair_tail_image(img, column_width);
+    // Step 2: 在最终 32800 高度上直接调整透明行
+    modify_throw_length(&scaled, target_throw)
 }
 
 /// 修改图片的投长度为目标值，总高度保持不变。

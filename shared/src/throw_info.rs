@@ -48,6 +48,10 @@ pub struct KeydStemInfo {
     pub as_keyd: Vec<u32>,
 }
 
+// ---------------------------------------------------------------------------
+// 查询函数（纯数据获取，无副作用）
+// ---------------------------------------------------------------------------
+
 /// 获取图片-键数-轨道关联信息。
 pub fn get_image_key_info(skin_dir: &Path) -> Result<Vec<ImageKeyInfo>, String> {
     let ini_path = skin_dir.join("skin.ini");
@@ -56,7 +60,6 @@ pub fn get_image_key_info(skin_dir: &Path) -> Result<Vec<ImageKeyInfo>, String> 
     }
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
 
-    // stem → Vec<(keys, columns)>
     let mut stem_map: HashMap<String, Vec<(u32, Vec<u32>)>> = HashMap::new();
 
     for section in &skin_ini.mania_sections {
@@ -68,10 +71,8 @@ pub fn get_image_key_info(skin_dir: &Path) -> Result<Vec<ImageKeyInfo>, String> 
         }
     }
 
-    // 合并同 keys 的条目
     let mut results: Vec<ImageKeyInfo> = Vec::new();
     for (stem, entries) in stem_map {
-        // 按 keys 分组合并 columns
         let mut key_groups: HashMap<u32, Vec<u32>> = HashMap::new();
         for (keys, cols) in &entries {
             key_groups.entry(*keys).or_default().extend(cols);
@@ -109,7 +110,6 @@ pub fn get_keyd_list(skin_dir: &Path) -> Result<Vec<KeydStemInfo>, String> {
     }
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
 
-    // stem → (as_key keys, as_keyd keys)
     let mut stem_map: HashMap<String, (HashSet<u32>, HashSet<u32>)> = HashMap::new();
 
     for section in &skin_ini.mania_sections {
@@ -147,10 +147,6 @@ pub fn get_keyd_list(skin_dir: &Path) -> Result<Vec<KeydStemInfo>, String> {
 }
 
 /// 获取皮肤的投长度信息。
-///
-/// 解析 skin.ini，对每个有 NoteImage#L 的键数读取当前投长度。
-/// - `current_throw`: stable 模式投长度（直接从原图顶部数透明行）
-/// - `lazer_throw`: lazer 模式投长度（应用 repair_tail_image 后数透明行）
 pub fn get_throw_info(skin_dir: &Path) -> Result<Vec<SkinThrowInfo>, String> {
     let ini_path = skin_dir.join("skin.ini");
     if !ini_path.exists() {
@@ -173,84 +169,86 @@ pub fn get_throw_info(skin_dir: &Path) -> Result<Vec<SkinThrowInfo>, String> {
         stems.sort();
         stems.dedup();
 
-        let _column_width = section.column_width;
-
         for stem in &stems {
-            let image_path = match skin_ini::find_image_file(skin_dir, stem) {
-                Some(p) => p,
-                None => {
-                    results.push(SkinThrowInfo {
-                        keys: section.keys,
-                        stem: stem.clone(),
-                        column_width: 0,
-                        current_throw: 0,
-                        lazer_throw: 0,
-                        height: 0,
-                        valid: false,
-                        is_2x: false,
-                    });
-                    continue;
-                }
-            };
-
-            let is_2x = image_utils::is_2x(&image_path);
-
-            // 尝试从缓存读取（按文件 hash 索引，跨目录复用）
-            let cache_key = throw_cache::hash_file(&image_path).ok();
-            let cached = cache_key.as_deref().and_then(throw_cache::get);
-
-            match image::open(&image_path) {
-                Ok(img) => {
-                    let rgba = img.to_rgba8();
-                    let (valid, height) = throw_length::validate_tail_image(&rgba);
-                    let current_throw = if let Some(ref c) = cached {
-                        c.stable_throw
-                    } else {
-                        let t = throw_length::compute_throw_stable(&rgba, section.column_width);
-                        // 首次计算 stable 时写入缓存（lazer 填 0 占位，后续更新）
-                        if let Some(ref k) = cache_key {
-                            throw_cache::set(k, &throw_cache::ThrowCacheEntry {
-                                stable_throw: t,
-                                lazer_throw: 0,
-                            });
-                        }
-                        t
-                    };
-                    let lazer_throw = cached.as_ref().map_or(0, |c| c.lazer_throw);
-
-                    results.push(SkinThrowInfo {
-                        keys: section.keys,
-                        stem: stem.clone(),
-                        column_width: section.column_width,
-                        current_throw,
-                        lazer_throw,
-                        height,
-                        valid,
-                        is_2x,
-                    });
-                }
-                Err(_) => {
-                    results.push(SkinThrowInfo {
-                        keys: section.keys,
-                        stem: stem.clone(),
-                        column_width: 0,
-                        current_throw: 0,
-                        lazer_throw: 0,
-                        height: 0,
-                        valid: false,
-                        is_2x,
-                    });
-                }
-            }
+            let info = read_single_throw_info(skin_dir, stem, section.keys, section.column_width);
+            results.push(info);
         }
     }
 
     Ok(results)
 }
 
+/// 读取单个 stem 的投长度信息（含缓存逻辑）。
+fn read_single_throw_info(
+    skin_dir: &Path,
+    stem: &str,
+    keys: u32,
+    column_width: u32,
+) -> SkinThrowInfo {
+    let image_path = match skin_ini::find_image_file(skin_dir, stem) {
+        Some(p) => p,
+        None => {
+            return SkinThrowInfo {
+                keys,
+                stem: stem.to_string(),
+                column_width: 0,
+                current_throw: 0,
+                lazer_throw: 0,
+                height: 0,
+                valid: false,
+                is_2x: false,
+            };
+        }
+    };
+
+    let is_2x = image_utils::is_2x(&image_path);
+
+    let cache_key = throw_cache::hash_file(&image_path).ok();
+    let cached = cache_key.as_deref().and_then(throw_cache::get);
+
+    match image::open(&image_path) {
+        Ok(img) => {
+            let rgba = img.to_rgba8();
+            let (valid, height) = throw_length::validate_tail_image(&rgba);
+            let current_throw = if let Some(ref c) = cached {
+                c.stable_throw
+            } else {
+                let t = throw_length::compute_throw_stable(&rgba, column_width);
+                if let Some(ref k) = cache_key {
+                    throw_cache::set(k, &throw_cache::ThrowCacheEntry {
+                        stable_throw: t,
+                        lazer_throw: 0,
+                    });
+                }
+                t
+            };
+            let lazer_throw = cached.as_ref().map_or(0, |c| c.lazer_throw);
+
+            SkinThrowInfo {
+                keys,
+                stem: stem.to_string(),
+                column_width,
+                current_throw,
+                lazer_throw,
+                height,
+                valid,
+                is_2x,
+            }
+        }
+        Err(_) => SkinThrowInfo {
+            keys,
+            stem: stem.to_string(),
+            column_width: 0,
+            current_throw: 0,
+            lazer_throw: 0,
+            height: 0,
+            valid: false,
+            is_2x,
+        },
+    }
+}
+
 /// 按需计算指定 stems 的 lazer 投长度（优先从缓存读取，未命中则计算并写缓存）。
-///
-/// 返回 (stem, lazer_throw) 的列表。
 pub fn compute_lazer_throws(
     skin_dir: &Path,
     stems: &[String],
@@ -269,7 +267,7 @@ pub fn compute_lazer_throws(
     Ok(results)
 }
 
-/// 计算单个 stem 的 lazer 投长度（column_width 仅 API 兼容，实际不影响结果）。
+/// 计算单个 stem 的 lazer 投长度。
 ///
 /// 优先从缓存读取，未命中则计算并写入缓存。
 /// 返回 lazer_throw（px），失败返回 0。
@@ -283,20 +281,17 @@ pub fn compute_lazer_throw_single(
         None => return 0,
     };
 
-    // 查缓存
     if let Ok(cache_key) = throw_cache::hash_file(&image_path) {
         if let Some(cached) = throw_cache::get(&cache_key) {
             if cached.lazer_throw > 0 {
                 return cached.lazer_throw;
             }
         }
-        // 计算
         if let Ok(img) = image::open(&image_path) {
             let rgba = img.to_rgba8();
             let (valid, _) = throw_length::validate_tail_image(&rgba);
             if valid {
                 let t = throw_length::compute_throw_lazer(&rgba, 0);
-                // 写缓存：保留已有 stable_throw，更新 lazer_throw
                 let stable = throw_cache::get(&cache_key)
                     .map_or(0, |c| c.stable_throw);
                 throw_cache::set(&cache_key, &throw_cache::ThrowCacheEntry {
@@ -311,12 +306,81 @@ pub fn compute_lazer_throw_single(
     0
 }
 
+// ---------------------------------------------------------------------------
+// 修改函数
+// ---------------------------------------------------------------------------
+
+/// 对单个 stem 执行投长度修改。
+///
+/// 返回日志行。
+pub fn modify_one_throw_stem(
+    skin_dir: &Path,
+    stem: &str,
+    keys: u32,
+    target_throw: u32,
+    mode: &str,
+    cw: u32,
+    backup_dir: &Path,
+    ts_dir: &str,
+) -> Result<Vec<String>, String> {
+    let mut log: Vec<String> = Vec::new();
+
+    let image_path = match skin_ini::find_image_file(skin_dir, stem) {
+        Some(p) => p,
+        None => {
+            log.push(format!(
+                "⚠ 找不到面尾图片: {} ({}k)",
+                stem, keys
+            ));
+            return Ok(log);
+        }
+    };
+
+    let img = image::open(&image_path)
+        .map_err(|e| format!("读取图片失败 {}: {}", stem, e))?
+        .to_rgba8();
+
+    let current_throw = throw_length::find_throw_length(&img);
+
+    let modified = if mode == "lazer" {
+        let h = img.height();
+        let current_lazer = if h > 0 {
+            ((current_throw as u64 * 32800) / h as u64) as u32
+        } else {
+            0
+        };
+        log.push(format!(
+            "{} {}k: 投长度 {}px → {}px (Lazer, cw={})",
+            image_path.display(),
+            keys,
+            current_lazer,
+            target_throw,
+            cw,
+        ));
+        throw_length::modify_throw_length_lazer(&img, target_throw, cw)
+    } else {
+        log.push(format!(
+            "{} {}k: 投长度 {}px → {}px (Stable)",
+            image_path.display(),
+            keys,
+            current_throw,
+            target_throw,
+        ));
+        throw_length::modify_throw_length(&img, target_throw)
+    };
+
+    backup::backup_file(skin_dir, &image_path, backup_dir, ts_dir)?;
+    modified
+        .save(&image_path)
+        .map_err(|e| format!("保存失败 {}: {}", stem, e))?;
+
+    Ok(log)
+}
+
 /// 执行投长度修改。
 ///
 /// # 参数
-/// - `skin_dir`: 皮肤根目录
 /// - `throw_map`: 键数 → 目标投长度的映射
-/// - `backup_dir`: 备份根目录（将在其下创建时间戳子目录）
 /// - `mode`: "stable" 或 "lazer"
 /// - `column_widths`: 键数 → ColumnWidth 映射（仅 lazer 模式需要）
 ///
@@ -336,10 +400,6 @@ pub fn execute_throw_modification(
 
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
     let mut log: Vec<String> = Vec::new();
-    let add_log = |log: &mut Vec<String>, msg: &str| {
-        log.push(msg.to_string());
-        crate::logger::log_info("throw", msg);
-    };
 
     let mut seen = HashSet::new();
     let mut processed = false;
@@ -351,78 +411,32 @@ pub fn execute_throw_modification(
             None => continue,
         };
 
-        let cw = column_widths.get(&section.keys).copied().unwrap_or(section.column_width);
+        let cw = column_widths
+            .get(&section.keys)
+            .copied()
+            .unwrap_or(section.column_width);
 
         for r in &section.note_image_ls {
             if !seen.insert(r.name.clone()) {
                 continue;
             }
 
-            let image_path = match skin_ini::find_image_file(skin_dir, &r.name) {
-                Some(p) => p,
-                None => {
-                    add_log(
-                        &mut log,
-                        &format!("⚠ 找不到面尾图片: {} ({}k)", r.name, section.keys),
-                    );
-                    continue;
-                }
-            };
-
-            let img = image::open(&image_path)
-                .map_err(|e| format!("读取图片失败 {}: {}", r.name, e))?
-                .to_rgba8();
-
-            let current_throw = throw_length::find_throw_length(&img);
-
-            let modified = if mode == "lazer" {
-                // current_throw 是原图 Stable 值，转为 Lazer 坐标再打日志，和 target_throw 统一
-                let h = img.height();
-                let current_lazer = if h > 0 { ((current_throw as u64 * 32800) / h as u64) as u32 } else { 0 };
-                add_log(
-                    &mut log,
-                    &format!(
-                        "{} {}k: 投长度 {}px → {}px (Lazer, cw={})",
-                        image_path.display(),
-                        section.keys,
-                        current_lazer,
-                        target_throw,
-                        cw,
-                    ),
-                );
-                throw_length::modify_throw_length_lazer(&img, target_throw, cw)
-            } else {
-                add_log(
-                    &mut log,
-                    &format!(
-                        "{} {}k: 投长度 {}px → {}px (Stable)",
-                        image_path.display(),
-                        section.keys,
-                        current_throw,
-                        target_throw,
-                    ),
-                );
-                throw_length::modify_throw_length(&img, target_throw)
-            };
-
-            backup::backup_file(skin_dir, &image_path, backup_dir, &ts_dir)?;
-            modified
-                .save(&image_path)
-                .map_err(|e| format!("保存失败 {}: {}", r.name, e))?;
-            add_log(
-                &mut log,
-                &format!("  ✓ {} 已保存 ({}×{})", image_path.display(), modified.width(), modified.height()),
-            );
+            match modify_one_throw_stem(
+                skin_dir, &r.name, section.keys, target_throw,
+                mode, cw, backup_dir, &ts_dir,
+            ) {
+                Ok(stem_log) => log.extend(stem_log),
+                Err(e) => log.push(format!("✗ {}: {}", r.name, e)),
+            }
             processed = true;
         }
     }
 
     if !processed {
-        add_log(&mut log, "未找到匹配的键数小节");
+        log.push("未找到匹配的键数小节".to_string());
     } else {
-        add_log(&mut log, "修改完成！");
+        log.push("修改完成！".to_string());
     }
 
     Ok(log)
 }
-

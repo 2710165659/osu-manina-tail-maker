@@ -2,7 +2,7 @@
   <div class="add-script">
     <!-- 描述卡片 -->
     <div class="desc-card">
-      <p class="desc-text">为皮肤添加一个独立的“一键修改面尾”程序，放在皮肤根目录的 <code>scripts</code> 文件夹下。双击程序即可快速切换投长度或使用其他预设，免去手动替换文件的麻烦。</p>
+      <p class="desc-text">为皮肤添加一个独立的"一键修改面尾"程序，放在皮肤根目录的 <code>scripts</code> 文件夹下。双击程序即可快速切换投长度或使用其他预设，免去手动替换文件的麻烦。</p>
     </div>
 
     <!-- 配置区域 -->
@@ -62,55 +62,45 @@
       </div>
     </div>
 
-    <!-- 日志区域 -->
-    <div class="log-section">
-      <div class="log-header">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.1" />
-          <path d="M3.5 4h5M3.5 6h3M3.5 8h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" />
-        </svg>
-        <span>日志</span>
-      </div>
-      <div class="log-content" ref="logContainer">
-        <template v-if="logs.length === 0">
-          <div class="log-empty">
-            <span class="log-empty-icon">~</span>
-            <span>等待操作...</span>
-          </div>
-        </template>
-        <template v-else>
-          <div v-for="(log, index) in logs" :key="index" :class="['log-line', log.type]">
-            <span class="log-time">{{ log.time }}</span>
-            <span class="log-marker">›</span>
-            <span class="log-msg">{{ log.message }}</span>
-          </div>
-        </template>
-      </div>
-    </div>
+    <!-- 日志区域（使用共享 LogPanel） -->
+    <LogPanel :logs="logs" max-height="160px" empty-text="等待操作..." />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import { useConfig } from '../../composables/useConfig'
+import { useToolLogger } from '../../composables/useToolLogger'
+import LogPanel from '../shared/LogPanel.vue'
 
 const { presets } = useConfig()
 
 const filePath = ref('')
 const selectedPresetNames = ref(new Set<string>())
 const executing = ref(false)
-const logContainer = ref<HTMLDivElement>()
-
-interface LogEntry {
-  time: string
-  message: string
-  type: 'info' | 'success' | 'warning' | 'error'
-}
-
-const logs = ref<LogEntry[]>([])
 
 const canExecute = computed(() => {
-  return !!filePath.value
+  return !!filePath.value && !executing.value
+})
+
+const { logs, push, clear } = useToolLogger({
+  target: 'addscript',
+  onError: () => { executing.value = false },
+  onData: (_target, data) => {
+    const d = data as { done?: boolean }
+    if (d.done) {
+      executing.value = false
+    }
+  },
+})
+
+// 组件卸载时取消后端任务
+onUnmounted(() => {
+  if (executing.value) {
+    invoke('cancel_add_script')
+    executing.value = false
+  }
 })
 
 function togglePreset(name: string) {
@@ -119,17 +109,6 @@ function togglePreset(name: string) {
   } else {
     selectedPresetNames.value.add(name)
   }
-}
-
-function addLog(message: string, type: LogEntry['type'] = 'info') {
-  const now = new Date()
-  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
-  logs.value.push({ time, message, type })
-  nextTick(() => {
-    if (logContainer.value) {
-      logContainer.value.scrollTop = logContainer.value.scrollHeight
-    }
-  })
 }
 
 async function handleBrowse() {
@@ -143,69 +122,40 @@ async function handleBrowse() {
 
     if (selected) {
       const path = Array.isArray(selected) ? selected[0] : selected
-      const { invoke } = await import('@tauri-apps/api/core')
       const valid = await invoke('check_skin_ini', { folderPath: path })
       if (!valid) {
-        addLog(`✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录`, 'error')
+        push('✗ 所选文件夹不包含 skin.ini，请选择有效的皮肤目录', 'error')
         return
       }
       filePath.value = path
-      addLog(`已选择：${path}`, 'info')
+      push(`已选择：${path}`, 'info')
     }
   } catch (e) {
-    addLog(`文件选择失败：${e}`, 'error')
+    push(`文件选择失败：${e}`, 'error')
   }
 }
 
-async function handleAddScript() {
+function handleAddScript() {
   if (!canExecute.value || executing.value) return
 
   executing.value = true
+  clear()
 
-  const selectedPresets = presets.value.filter(p => selectedPresetNames.value.has(p.name))
-
-  addLog('开始添加脚本任务...', 'info')
-  addLog(`文件路径：${filePath.value}`, 'info')
-  addLog(`选中预设：${selectedPresets.map(p => p.name).join('、')}`, 'info')
-
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-
-    // 导出预设图片（完整分辨率）
-    const presetImages: [string, number[]][] = []
-    if (selectedPresets.length > 0) {
-      addLog('正在导出预设图片...', 'info')
-      for (const preset of selectedPresets) {
-        try {
-          const base64 = await invoke<string>('export_image_bytes', { config: preset.config })
-          // 将 base64 转换为字节数组
-          const binaryStr = atob(base64)
-          const bytes = Array.from(binaryStr, c => c.charCodeAt(0))
-          presetImages.push([preset.name, bytes])
-          addLog(`  ✓ 导出预设：${preset.name}`, 'info')
-        } catch (e) {
-          addLog(`  ✗ 导出预设 ${preset.name} 失败：${e}`, 'warning')
-        }
-      }
-    }
-
-    addLog('正在复制外部工具...', 'info')
-    const result = await invoke('copy_external_tool_with_presets', {
-      targetPath: filePath.value,
-      presetImages: presetImages,
-    })
-    addLog(`✓ 外部工具已复制到：${result}`, 'success')
-
-    if (presetImages.length > 0) {
-      addLog(`✓ 已添加 ${presetImages.length} 个预设图片`, 'success')
-    }
-
-    addLog('✓ 脚本添加完成！', 'success')
-  } catch (e) {
-    addLog(`✗ 操作失败：${e}`, 'error')
-  } finally {
-    executing.value = false
+  const names = [...selectedPresetNames.value]
+  push(`开始添加脚本任务...`, 'info')
+  push(`目标文件夹: ${filePath.value}`, 'info')
+  if (names.length > 0) {
+    push(`选中预设: ${names.join('、')}`, 'info')
   }
+
+  // Fire-and-forget: 后端通过 app:event target="addscript" 推送进度
+  invoke('add_script_to_skin', {
+    folderPath: filePath.value,
+    presetNames: names,
+  }).catch((e) => {
+    push(`启动失败：${e}`, 'error')
+    executing.value = false
+  })
 }
 </script>
 
@@ -451,104 +401,5 @@ async function handleAddScript() {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-/* Log Section */
-.log-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.log-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.log-header svg {
-  opacity: 0.6;
-}
-
-.log-content {
-  height: 160px;
-  overflow-y: auto;
-  padding: 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  line-height: 1.8;
-}
-
-.log-content::-webkit-scrollbar {
-  width: 4px;
-}
-
-.log-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.log-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-}
-
-.log-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.log-empty-icon {
-  color: var(--accent-purple);
-  opacity: 0.5;
-}
-
-.log-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.log-time {
-  color: var(--text-muted);
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.log-marker {
-  color: var(--accent-purple);
-  opacity: 0.4;
-  flex-shrink: 0;
-}
-
-.log-msg {
-  flex: 1;
-  word-break: break-all;
-}
-
-.log-line.info .log-msg {
-  color: var(--text-secondary);
-}
-
-.log-line.success .log-msg {
-  color: #44ee88;
-}
-
-.log-line.warning .log-msg {
-  color: #ffaa44;
-}
-
-.log-line.error .log-msg {
-  color: #ff4466;
 }
 </style>

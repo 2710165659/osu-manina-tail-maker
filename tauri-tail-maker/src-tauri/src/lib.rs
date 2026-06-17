@@ -51,6 +51,8 @@ pub fn run() {
             get_image_key_info,
             get_keyd_list,
             convert_tail_toolbox,
+            add_script_to_skin,
+            cancel_add_script,
             batch_export_images,
             cancel_batch_export,
             load_presets,
