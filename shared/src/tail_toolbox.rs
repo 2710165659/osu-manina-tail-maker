@@ -41,9 +41,12 @@ pub fn execute_key_repair_step(
 /// 步骤 2：预设替换。
 ///
 /// `presets`: `[(stem, preset_name)]` 的列表。
+/// 替换前将原面尾图片备份到 `backup_dir/{ts_dir}/` 下。
 pub fn execute_preset_step(
     skin_dir: &Path,
     presets: &[(String, String)],
+    backup_dir: &Path,
+    ts_dir: &str,
 ) -> Result<Vec<String>, String> {
     if presets.is_empty() {
         return Ok(vec!["没有选择预设替换".to_string()]);
@@ -54,7 +57,7 @@ pub fn execute_preset_step(
         .map(|(s, p)| (s.as_str(), p.as_str()))
         .collect();
 
-    apply_presets_by_stem(skin_dir, &preset_map)
+    apply_presets_by_stem(skin_dir, &preset_map, backup_dir, ts_dir)
 }
 
 /// 步骤 3：修改投长度。
@@ -113,7 +116,7 @@ pub fn execute_toolbox(
     // ---------- Step 2: 预设替换 ----------
     if !presets.is_empty() {
         log.push("--- 用预设替换现有图片 ---".to_string());
-        match execute_preset_step(skin_dir, presets) {
+        match execute_preset_step(skin_dir, presets, backup_dir, &ts_dir) {
             Ok(preset_log) => log.extend(preset_log),
             Err(e) => log.push(format!("预设替换失败: {}", e)),
         }
@@ -161,9 +164,12 @@ pub fn collect_column_widths(
 // ---------------------------------------------------------------------------
 
 /// 按 stem 应用预设：用预设图片覆盖对应面尾图片文件。
+/// 覆盖前先备份原文件。
 fn apply_presets_by_stem(
     skin_dir: &Path,
     presets: &HashMap<&str, &str>,
+    backup_dir: &Path,
+    ts_dir: &str,
 ) -> Result<Vec<String>, String> {
     let ini_path = skin_dir.join("skin.ini");
     let skin_ini = skin_ini::parse_skin_ini(&ini_path)?;
@@ -181,7 +187,7 @@ fn apply_presets_by_stem(
                 continue;
             }
 
-            match apply_one_preset(skin_dir, &r.name, preset_name) {
+            match apply_one_preset(skin_dir, &r.name, preset_name, backup_dir, ts_dir) {
                 Ok(msg) => log.push(msg),
                 Err(msg) => log.push(msg),
             }
@@ -193,11 +199,24 @@ fn apply_presets_by_stem(
 
 /// 对单个 stem 应用一个预设替换。
 /// `preset_src` 可以是 base64 data URL（`data:image/png;base64,...`）或文件名/路径。
+/// 替换前先备份原文件。
 fn apply_one_preset(
     skin_dir: &Path,
     stem: &str,
     preset_src: &str,
+    backup_dir: &Path,
+    ts_dir: &str,
 ) -> Result<String, String> {
+    let image_path = match skin_ini::find_image_file(skin_dir, stem) {
+        Some(p) => p,
+        None => return Ok(format!("⚠ 找不到面尾图片: {}", stem)),
+    };
+
+    // 先备份原文件
+    if let Err(e) = backup::backup_file(skin_dir, &image_path, backup_dir, ts_dir) {
+        return Err(format!("⚠ 备份失败 {}: {}", stem, e));
+    }
+
     let preset_img = if preset_src.starts_with("data:") {
         // base64 data URL — 内置/用户预设
         decode_data_url(preset_src)
@@ -209,11 +228,6 @@ fn apply_one_preset(
         image::open(&preset_path)
             .map_err(|e| format!("⚠ 读取预设图片失败: {}", e))?
             .to_rgba8()
-    };
-
-    let image_path = match skin_ini::find_image_file(skin_dir, stem) {
-        Some(p) => p,
-        None => return Ok(format!("⚠ 找不到面尾图片: {}", stem)),
     };
 
     preset_img

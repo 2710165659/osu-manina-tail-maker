@@ -3,8 +3,12 @@
    Matching OneClickLength.vue appearance
    ============================================ */
 
-/* Font Import */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+/*
+ * Fonts: 使用系统自带字体，避免 @import 阻塞渲染。
+ * JetBrains Mono → 等宽字体回退链
+ * Noto Sans SC → 中文无衬线回退链
+ * 主工具使用 Google Fonts（通过 Vite 预加载），小工具无打包器故直接使用系统字体。
+ */
 
 /* CSS Variables - 与主项目保持一致 */
 :root {
@@ -51,7 +55,7 @@ html, body {
 }
 
 body {
-  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
   line-height: 1.5;
@@ -473,7 +477,7 @@ body::before {
 .ri-stem {
   font-size: 12px;
   color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -549,7 +553,7 @@ body::before {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -715,7 +719,7 @@ body::before {
   border-radius: 3px;
   color: var(--text-primary);
   font-size: 10px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   outline: none;
   text-align: right;
 }
@@ -951,7 +955,7 @@ body::before {
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 11px;
   line-height: 1.8;
 }

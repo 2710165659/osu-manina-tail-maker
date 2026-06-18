@@ -5,6 +5,7 @@
 
 // Detect Tauri invoke API — try multiple known paths
 let invoke;
+let listen; // Tauri event listener
 (function () {
   // __TAURI_INTERNALS__ is the low-level IPC bridge (always present)
   const ti = window.__TAURI_INTERNALS__;
@@ -13,7 +14,6 @@ let invoke;
       return ti.invoke(cmd, args);
     };
     console.log('[tail-maker] invoke via __TAURI_INTERNALS__.invoke');
-    return;
   }
 
   const t = window.__TAURI__;
@@ -24,36 +24,57 @@ let invoke;
   } else {
     console.log('[tail-maker] window.__TAURI__ is undefined');
   }
-  if (ti) {
-    console.log('[tail-maker] window.__TAURI_INTERNALS__ keys:', Object.keys(ti).join(', '));
-  } else {
-    console.log('[tail-maker] window.__TAURI_INTERNALS__ is undefined');
-  }
 
-  if (!t) return;
+  if (!t && !invoke) return;
 
   // Try known paths for invoke
-  if (typeof t.invoke === 'function') {
-    invoke = t.invoke.bind(t);
-  } else if (t.tauri && typeof t.tauri.invoke === 'function') {
-    invoke = t.tauri.invoke.bind(t.tauri);
-  } else if (t.core && typeof t.core.invoke === 'function') {
-    invoke = t.core.invoke.bind(t.core);
+  if (!invoke) {
+    if (typeof t.invoke === 'function') {
+      invoke = t.invoke.bind(t);
+    } else if (t.tauri && typeof t.tauri.invoke === 'function') {
+      invoke = t.tauri.invoke.bind(t.tauri);
+    } else if (t.core && typeof t.core.invoke === 'function') {
+      invoke = t.core.invoke.bind(t.core);
+    } else {
+      for (const key of Object.keys(t)) {
+        try {
+          const sub = t[key];
+          if (sub && typeof sub === 'object' && typeof sub.invoke === 'function') {
+            invoke = sub.invoke.bind(sub);
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+  }
+  if (invoke) {
+    console.log('[tail-maker] invoke found');
   } else {
+    console.log('[tail-maker] invoke NOT FOUND');
+  }
+
+  // Try known paths for listen (event subscription)
+  if (t && typeof t.listen === 'function') {
+    listen = t.listen.bind(t);
+  } else if (ti && typeof ti.listen === 'function') {
+    listen = ti.listen.bind(ti);
+  } else if (t && t.event && typeof t.event.listen === 'function') {
+    listen = t.event.listen.bind(t.event);
+  } else if (t) {
     for (const key of Object.keys(t)) {
       try {
         const sub = t[key];
-        if (sub && typeof sub === 'object' && typeof sub.invoke === 'function') {
-          invoke = sub.invoke.bind(sub);
+        if (sub && typeof sub === 'object' && typeof sub.listen === 'function') {
+          listen = sub.listen.bind(sub);
           break;
         }
       } catch (_) {}
     }
   }
-  if (invoke) {
-    console.log('[tail-maker] invoke found via window.__TAURI__');
+  if (listen) {
+    console.log('[tail-maker] listen found');
   } else {
-    console.log('[tail-maker] invoke NOT FOUND');
+    console.log('[tail-maker] listen NOT FOUND — events will not work');
   }
 })();
 
@@ -64,13 +85,13 @@ const $ = (id) => document.getElementById(id);
 
 function presetSrc(path) {
   if (path.startsWith('data:')) return path;
-  // Tauri v2: use asset protocol
+  // Tauri v2: use asset protocol for local files
   return `asset://localhost/${encodeURIComponent(path)}`;
 }
 
 function getModeThrow(info) {
   if (state.workMode === 'lazer') {
-    return info.lazer_throw > 0 ? info.lazer_throw : '…';
+    return info.lazer_throw > 0 ? info.lazer_throw : '\u2026';
   }
   return info.current_throw;
 }
@@ -97,8 +118,6 @@ const state = {
   modifying: false,
 };
 
-const throwCache = new Map(); // stem → Promise<number>
-
 // ============================================
 // Log
 // ============================================
@@ -110,9 +129,67 @@ function addLog(message, type = 'info') {
   const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
   const line = document.createElement('div');
   line.className = `log-line ${type}`;
-  line.innerHTML = `<span class="log-time">${time}</span><span class="log-marker">›</span><span class="log-msg">${message}</span>`;
+  line.innerHTML = `<span class="log-time">${time}</span><span class="log-marker">\u203A</span><span class="log-msg">${message}</span>`;
   logContent.appendChild(line);
   logContent.scrollTop = logContent.scrollHeight;
+}
+
+function clearLogs() {
+  const logContent = $('log-content');
+  logContent.innerHTML = '<div class="log-empty"><span class="log-empty-icon">~</span><span>等待操作...</span></div>';
+}
+
+// ============================================
+// Event listeners
+// ============================================
+
+// Listen to app:throw-result (batch lazer throw computation results)
+function setupEventListeners() {
+  if (typeof listen !== 'function') return;
+
+  // app:throw-result — batch lazer throw results
+  listen('app:throw-result', (event) => {
+    const items = event.payload?.items;
+    if (!items || !Array.isArray(items)) return;
+    for (const item of items) {
+      for (const x of state.skinInfo) {
+        if (x.stem === item.stem) x.lazer_throw = item.lazer_throw;
+      }
+    }
+  });
+
+  // app:event — throw computation progress only (toolbox uses returned logs)
+  listen('app:event', (event) => {
+    const payload = event.payload;
+    if (!payload) return;
+    const { level, target, message, data } = payload;
+
+    // Throw computation progress
+    if (target === 'throw') {
+      if (data) {
+        if (data.items) {
+          for (const item of data.items) {
+            for (const x of state.skinInfo) {
+              if (x.stem === item.stem) x.lazer_throw = item.lazer_throw;
+            }
+          }
+        } else if (data.stem && data.lazer_throw !== undefined) {
+          for (const x of state.skinInfo) {
+            if (x.stem === data.stem) x.lazer_throw = data.lazer_throw;
+          }
+        }
+      }
+      if (level === 'done' || (data && data.done)) {
+        state.computingThrows = false;
+        for (const [k] of state.throwMap) {
+          const s = state.skinInfo.find(i => i.keys === k);
+          if (s && s.valid && s.lazer_throw > 0) state.throwMap.set(k, s.lazer_throw);
+        }
+        renderThrowSection();
+      }
+      return;
+    }
+  });
 }
 
 // ============================================
@@ -155,6 +232,12 @@ async function handleBrowse() {
   try {
     const selected = await invoke('browse_folder');
     if (selected) {
+      // Validate skin.ini exists (matching OneClickLength.vue)
+      const valid = await invoke('check_skin_ini', { folderPath: selected });
+      if (!valid) {
+        addLog('\u2717 所选文件夹不包含 skin.ini，请选择有效的皮肤目录', 'error');
+        return;
+      }
       state.filePath = selected;
       addLog(`已选择：${state.filePath}`, 'info');
       updatePathDisplay();
@@ -350,7 +433,7 @@ function renderPresetSection() {
           <div class="preset-selected" data-stem="${ik.stem}">
             <img src="${presetSrc(preset.image_path)}" class="preset-thumb" />
             <span class="preset-name-sm">${preset.name}</span>
-            <button class="preset-clear" data-stem="${ik.stem}">×</button>
+            <button class="preset-clear" data-stem="${ik.stem}">\u00D7</button>
           </div>` : `
           <button class="preset-pick-btn" data-stem="${ik.stem}">选择预设</button>`}
       </div>
@@ -521,7 +604,6 @@ function renderThrowSection() {
 async function loadAll() {
   state.loadingInfo = true;
   state.throwMap.clear();
-  throwCache.clear();
   Object.keys(state.stemPresets).forEach(k => delete state.stemPresets[k]);
   state.keydChecked.clear();
   state.keydInfos = [];
@@ -563,7 +645,7 @@ async function loadPresetList() {
   } catch (e) { addLog(`图片关联加载失败: ${e}`, 'warning'); state.imageKeyInfos = []; }
 
   try {
-    const p = await invoke('load_presets');
+    const p = await invoke('load_presets', { skinRoot: state.filePath });
     state.presets = p;
     if (p.length > 0) addLog(`已加载 ${p.length} 个预设`, 'success');
     else addLog('未找到预设图片', 'info');
@@ -583,7 +665,7 @@ async function loadThrowInfo() {
     if (keys.length > 0) {
       addLog(`检测到键数: ${keys.map(k => k + 'k').join(', ')}`, 'info');
       for (const s of info.filter(i => !i.valid)) {
-        addLog(`⚠ ${s.keys}k ${s.stem}: 高度 ${s.height}px，不满足 >5000，不可修改`, 'warning');
+        addLog(`\u26A0 ${s.keys}k ${s.stem}: 高度 ${s.height}px，不满足 >5000，不可修改`, 'warning');
       }
     } else {
       addLog('未找到任何 NoteImage#L 面尾定义', 'warning');
@@ -598,12 +680,11 @@ async function loadThrowInfo() {
 async function computeAllThrows() {
   if (state.workMode !== 'lazer') return;
 
-  // Dedup by stem only
+  // Collect unique valid stems with uncomputed lazer_throw
   const seenStems = new Set();
   const stems = [];
-
   for (const s of state.skinInfo) {
-    if (!s.valid) continue;
+    if (!s.valid || s.lazer_throw > 0) continue;
     if (seenStems.has(s.stem)) continue;
     seenStems.add(s.stem);
     stems.push(s.stem);
@@ -618,7 +699,6 @@ async function computeAllThrows() {
   renderThrowSection();
 
   try {
-    // Batch compute all stems at once
     addLog(`正在计算 ${stems.length} 个 stem 的 Lazer 投长度...`, 'info');
     const results = await invoke('compute_lazer_throws', { skinRoot: state.filePath, stems });
 
@@ -632,7 +712,7 @@ async function computeAllThrows() {
     }
     addLog('投长度计算完成', 'success');
 
-    // 同步已勾选的 throwMap
+    // Sync checked keys
     for (const [k] of state.throwMap) {
       const s = state.skinInfo.find(i => i.keys === k);
       if (s && s.valid && s.lazer_throw > 0) {
@@ -648,15 +728,15 @@ async function computeAllThrows() {
 }
 
 // ============================================
-// Modify
+// Modify (awaits result, uses returned logs — works without event listener)
 // ============================================
 async function handleModify() {
   if (!canModify()) return;
   state.modifying = true;
   updateModifyBtn();
+  clearLogs();
 
-  addLog(`文件：${state.filePath}`, 'info');
-  addLog(`开始修改... 模式: ${state.workMode}`, 'info');
+  addLog(`开始一键修改面尾... 模式: ${state.workMode}`, 'info');
 
   const entries = [...state.throwMap.entries()].sort((a, b) => a[0] - b[0]);
   const throws = entries.map(([k, v]) => [k, v]);
@@ -668,38 +748,30 @@ async function handleModify() {
   const keydStems = [...state.keydChecked];
 
   try {
-    const result = await invoke('convert_tail', {
-      config: {
-        skin_root: state.filePath,
-        mode: state.workMode,
-        throws,
-        presets: presetList,
-        keyd_stems: keydStems,
-      },
+    const logs = await invoke('convert_tail_toolbox', {
+      folderPath: state.filePath,
+      workMode: state.workMode,
+      throws,
+      presets: presetList,
+      keydStems,
     });
 
-    for (const line of result.logs) {
-      const type = line.startsWith('  ✓') ? 'success'
-        : line.includes('⚠') || line.startsWith('  ✗') ? 'warning'
-        : 'info';
-      addLog(line, type);
+    // Display all returned logs
+    for (const entry of logs) {
+      addLog(entry.message, entry.level === 'done' ? 'success' : entry.level);
     }
-    if (result.success) {
-      addLog('修改完成！', 'success');
-      // 重新加载投长度信息
-      await loadThrowInfo();
-      // 同步已勾选键数的 throwMap
-      for (const [k] of state.throwMap) {
-        const s = state.skinInfo.find(i => i.keys === k);
-        if (s && s.valid) {
-          const def = getModeThrow(s);
-          state.throwMap.set(k, typeof def === 'number' ? def : s.current_throw);
-        }
+
+    // Reload throw info after modification
+    await loadThrowInfo();
+    // Sync checked keys
+    for (const [k] of state.throwMap) {
+      const s = state.skinInfo.find(i => i.keys === k);
+      if (s && s.valid) {
+        const def = getModeThrow(s);
+        state.throwMap.set(k, typeof def === 'number' ? def : s.current_throw);
       }
-      renderThrowSection();
-    } else {
-      addLog(`修改失败: ${result.message}`, 'error');
     }
+    renderThrowSection();
   } catch (e) {
     addLog(`修改失败：${e}`, 'error');
   } finally {
@@ -720,7 +792,10 @@ async function init() {
     return;
   }
 
-  // Setup event listeners
+  // Setup event listeners first
+  setupEventListeners();
+
+  // Setup UI event listeners
   setupModeRadios();
   $('browse-btn').addEventListener('click', handleBrowse);
   $('modify-btn').addEventListener('click', handleModify);
@@ -737,7 +812,14 @@ async function init() {
     });
   }
 
-  // Auto-find skin root
+  // Always render initial state immediately (show placeholders, don't wait for find_skin_root)
+  renderKeydSection();
+  renderPresetSection();
+  renderThrowSection();
+  updateModifyBtn();
+
+  // Auto-find skin root (three-layer search — unique to external tool)
+  // Runs in background via spawn_blocking, doesn't block the UI
   try {
     const skinResult = await invoke('find_skin_root');
     if (skinResult.success) {
@@ -753,12 +835,6 @@ async function init() {
     addLog(`初始化失败: ${e}`, 'error');
     addLog('请点击"浏览"选择皮肤文件夹', 'info');
   }
-
-  // Always render initial state (show placeholders)
-  renderKeydSection();
-  renderPresetSection();
-  renderThrowSection();
-  updateModifyBtn();
 }
 
 document.addEventListener('DOMContentLoaded', init);

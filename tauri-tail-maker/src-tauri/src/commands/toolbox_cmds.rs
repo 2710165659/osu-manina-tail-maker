@@ -181,7 +181,10 @@ pub async fn convert_tail_toolbox(
                 (stem.clone(), name.clone())
             }).collect();
 
-            match shared::tail_toolbox::execute_preset_step(&skin_dir, &resolved) {
+            match shared::tail_toolbox::execute_preset_step(
+                &skin_dir, &resolved, &backup_dir,
+                &shared::backup::backup_timestamp(),
+            ) {
                 Ok(preset_log) => {
                     for line in &preset_log {
                         events::emit_log(&app, "info", "toolbox", line);
