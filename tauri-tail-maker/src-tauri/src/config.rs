@@ -108,7 +108,6 @@ pub struct RgbaColor {
 
 impl RgbaColor {
     pub const WHITE: Self = Self { r: 255, g: 255, b: 255, a: 255 };
-    pub const BLACK: Self = Self { r: 0, g: 0, b: 0, a: 255 };
     pub const GREY: Self = Self { r: 113, g: 113, b: 113, a: 255 };
 }
 

@@ -55,9 +55,8 @@ pub async fn add_script_to_skin(
 
         // Phase 1: 导出预设图片
         let mut preset_images: Vec<(String, Vec<u8>)> = Vec::new();
-        let total_presets = presets.len();
 
-        for (i, preset) in presets.iter().enumerate() {
+        for preset in &presets {
             if ADDSCRIPT_CANCELLED.load(Ordering::SeqCst) {
                 events::emit_log(&app, "done", "addscript", "任务已取消");
                 shared::logger::log_info("addscript", "任务已取消");
