@@ -45,7 +45,6 @@
             <SkinAdapter v-else-if="activeTab === 'skinAdapter'" key="skinAdapter" />
             <OneClickLength v-else-if="activeTab === 'oneClickLength'" key="oneClickLength" />
             <AddScript v-else-if="activeTab === 'addScript'" key="addScript" />
-            <SkinValidator v-else-if="activeTab === 'skinValidator'" key="skinValidator" />
           </Transition>
         </main>
       </div>
@@ -59,7 +58,6 @@ import SkinAdapter from '../ToolPanel/SkinAdapter.vue'
 import OneClickLength from '../ToolPanel/OneClickLength.vue'
 import BatchGenerate from '../ToolPanel/BatchGenerate.vue'
 import AddScript from '../ToolPanel/AddScript.vue'
-import SkinValidator from '../ToolPanel/SkinValidator.vue'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -81,10 +79,6 @@ const tabs = [
   {
     id: 'addScript',
     label: '为皮肤添加脚本',
-  },
-  {
-    id: 'skinValidator',
-    label: '皮肤文件校验',
   }
 ]
 </script>

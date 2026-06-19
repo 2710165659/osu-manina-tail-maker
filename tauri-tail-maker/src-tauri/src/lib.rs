@@ -56,7 +56,6 @@ pub fn run() {
             batch_export_images,
             cancel_batch_export,
             load_presets,
-            validate_skin_files_cmd,
             check_skin_ini,
         ])
         .run(tauri::generate_context!())

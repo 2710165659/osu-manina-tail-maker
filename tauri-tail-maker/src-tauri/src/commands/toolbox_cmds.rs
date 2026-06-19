@@ -411,44 +411,6 @@ fn render_preset_thumbnail_sync(config: &TailConfig) -> String {
     base64::engine::general_purpose::STANDARD.encode(&png_bytes)
 }
 
-// ---- Validator ----
-
-/// 皮肤文件校验
-#[tauri::command]
-pub async fn validate_skin_files_cmd(folder_path: String) -> Result<Vec<String>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let dir = PathBuf::from(&folder_path);
-        if !dir.is_dir() {
-            return Err("指定的路径不是有效的文件夹".to_string());
-        }
-
-        let ini_path = dir.join("skin.ini");
-        if !ini_path.exists() {
-            return Err("未找到 skin.ini 文件".to_string());
-        }
-
-        let skin_ini = shared::skin_ini::parse_skin_ini(&ini_path)?;
-        let missing = shared::skin_validator::validate_skin_files(&skin_ini);
-
-        if missing.is_empty() {
-            let ok_msg = "所有图片文件均存在 ✓";
-            shared::logger::log_info("validator", ok_msg);
-            Ok(vec![ok_msg.to_string()])
-        } else {
-            let summary = format!("发现 {} 个缺失文件:", missing.len());
-            shared::logger::log_warn("validator", &summary);
-            let mut log: Vec<String> = vec![summary];
-            for m in &missing {
-                let keys_str: Vec<String> = m.keys.iter().map(|k| format!("{}k", k)).collect();
-                let msg = format!("  ✗ [{}] {} (引用自: {})", m.image_type, m.stem, keys_str.join(", "));
-                shared::logger::log_warn("validator", &msg);
-                log.push(msg);
-            }
-            Ok(log)
-        }
-    }).await.map_err(|e| format!("任务执行失败: {}", e))?
-}
-
 /// 校验文件夹是否为有效皮肤目录（包含 skin.ini）
 #[tauri::command]
 pub fn check_skin_ini(folder_path: String) -> Result<bool, String> {

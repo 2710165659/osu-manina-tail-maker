@@ -6,7 +6,6 @@ pub mod logger;
 pub mod preset_loader;
 pub mod skin_finder;
 pub mod skin_ini;
-pub mod skin_validator;
 pub mod tail_repair;
 pub mod tail_toolbox;
 pub mod throw_cache;
