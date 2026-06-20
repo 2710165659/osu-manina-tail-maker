@@ -22,7 +22,7 @@
 
 - 🎨 **可视化制作面尾** — 调节投长度、顶端形状、颜色、透明度等，所见即所得
 - 🧰 **批量操作** — 批量生成不同长度的面尾图片、一键修复 lazer 皮肤适配问题
-- 📦 **独立小工具** — 可将面尾修改器打包进你的皮肤文件夹，分享给其他玩家使用
+- 🚀 **独立小工具** — 提供独立的「一键修改面尾」工具，可随皮肤一起分发
 
 <p align="center">
   <img src="imgs/工具箱.png" alt="工具箱界面" width="600">
@@ -32,15 +32,10 @@
 
 ### 从 Release 下载
 
-前往 [Releases](https://github.com/2710165659/osu-manina-tail-maker/releases) 页面，下载对应平台的最新版本：
+前往 [Releases](https://github.com/2710165659/osu-manina-tail-maker/releases) 页面下载最新版本：
 
-| 平台 | 文件 |
-|------|------|
-| Windows | `osu-mania-tail-maker_*.exe` (安装包) |
-| macOS | `osu-mania-tail-maker_*.dmg` |
-| Linux | `osu-mania-tail-maker_*.AppImage` / `.deb` |
-
-> 外部小工具 (`tail-maker-external`) 已包含在主程序的安装包内。如需单独使用，也可在 Release 中下载独立版本。
+- **主程序** — `osu-mania-tail-maker.exe`，完整功能的桌面应用
+- **外部小工具** — `osu-tail-maker-external.exe`，独立的「一键修改面尾」工具，可随皮肤分发
 
 ## 主要功能：面尾制作
 
@@ -83,15 +78,14 @@
 - **批量图片生成：** 根据预设批量生成不同投长度的面尾图片。配置起始长度、步长和终止长度，自动生成一系列图片到目标文件夹。支持多预设同时生成。
 - **Lazer 皮肤适配：** 修复投皮转换为 osu!lazer 后，面尾拉伸或 KeyD 等图片拉伸的问题。操作前会自动备份原始文件到 `_backup` 文件夹，安全可回退。
 - **一键修改面尾：** 快速修改皮肤中所有面尾图片的投长度。选择皮肤文件夹，选择预设，一键批量替换。支持 lazer 投长度自动计算。
-- **为皮肤添加脚本：** 将外部小工具（一键修改面尾）打包到皮肤文件夹的 `scripts` 目录下。可将工具随皮肤一起分发，玩家双击即可使用预设或一键修改投长度。
 
 ## 外部小工具
 
-`tail-maker-external` 是一个独立的 Tauri 桌面应用，相当于「一键修改面尾」的独立版本。它被集成在主程序的资源目录中，也可以单独运行。
+`osu-tail-maker-external` 是一个独立的 Tauri 桌面应用，相当于「一键修改面尾」的独立版本。
 
 - 🪶 **轻量独立** — 无需安装主程序，可随皮肤一起分发
 - ⚡ **即开即用** — 双击打开，选择皮肤文件夹，一键修改
-- 🔗 **与主程序共享** — 算法、逻辑一致
+- 🔗 **与主程序算法一致** — 共享核心逻辑，效果完全相同
 
 ## 开发与构建
 
@@ -99,7 +93,7 @@
 
 | 工具 | 最低版本 | 说明 |
 |------|----------|------|
-| [Rust](https://rustup.rs/) | 1.77.2+ | 后端逻辑与 Tauri |
+| [Rust](https://rustup.rs/) | 1.88.0+ | 后端逻辑与 Tauri |
 | [Node.js](https://nodejs.org/) | 18+ | 前端构建 |
 | npm | 9+ | 包管理 |
 
@@ -133,7 +127,7 @@ npm install
 
 ```bash
 # 1. 先编译外部小工具（如需要）
-cargo build --release -p tail-maker-external
+cargo build --release -p osu-tail-maker-external
 
 # 2. 启动主应用开发服务器
 cd tauri-tail-maker
@@ -148,24 +142,24 @@ npm run tauri dev
 .\run-build.ps1
 ```
 
-**手动构建：**
+**手动构建（Windows / macOS / Linux）：**
 
 ```bash
 # 1. 编译外部小工具
-cargo build --release -p tail-maker-external
+cargo build --release -p osu-tail-maker-external
 
 # 2. 构建主应用（前端 + Tauri 打包）
 cd tauri-tail-maker
 npm run tauri:build
 ```
 
-构建产物位于 `tauri-tail-maker/src-tauri/target/release/bundle/`。
+> macOS / Linux 用户需先安装 [Tauri 2 系统依赖](https://v2.tauri.app/start/prerequisites/)。
 
-### 仅构建外部小工具
+## 仅构建外部小工具
 
 ```bash
-cargo build --release -p tail-maker-external
-# 二进制位于 target/release/tail-maker-external[.exe]
+cargo build --release -p osu-tail-maker-external
+# 产物位于 target/release/osu-tail-maker-external.exe
 ```
 
 ### 项目结构

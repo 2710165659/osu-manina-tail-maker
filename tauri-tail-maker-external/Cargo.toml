@@ -1,11 +1,11 @@
 [package]
-name = "tail-maker-external"
+name = "osu-tail-maker-external"
 version = "0.1.0"
 description = "osu!mania Tail Maker External Tool"
 authors = ["xuan_yuan"]
 license = ""
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.88.0"
 
 [lib]
 name = "tail_maker_external_lib"
@@ -24,3 +24,10 @@ tauri-plugin-dialog = "2"
 image = { version = "0.25", default-features = false, features = ["png"] }
 shared = { path = "../shared" }
 base64 = "0.22"
+
+[profile.release]
+opt-level = "z"          # 追求体积最小化（优于 "s"）
+lto = true               # 启用链接时优化，可大幅消除死代码
+codegen-units = 1        # 降低并行编译粒度，让优化更激进
+panic = "abort"          # 去除 unwinding 支持，节省约 30–50 KB
+strip = true             # 剔除符号表（效果等同于手动 strip）

@@ -8,7 +8,7 @@ $ProjectRoot = $PSScriptRoot
 $TauriDir = Join-Path $ProjectRoot "tauri-tail-maker"
 $ToolsDir = Join-Path $ProjectRoot "tauri-tail-maker-external"
 $SharedDir = Join-Path $ProjectRoot "shared"
-$ExePath = Join-Path $ToolsDir "target" "release" "tail-maker-external.exe"
+$ExePath = Join-Path $ToolsDir "target" "release" "osu-tail-maker-external.exe"
 $SrcDir = Join-Path $ToolsDir "src"
 $FrontendDir = Join-Path $ToolsDir "frontend"
 
@@ -48,9 +48,9 @@ if (-not (Test-Path $SrcDir)) {
         Write-Host "🔨 开始编译小工具..." -ForegroundColor Cyan
         Push-Location $ProjectRoot
         try {
-            cargo build --release -p tail-maker-external
+            cargo build --release -p osu-tail-maker-external
             if ($LASTEXITCODE -ne 0) {
-                throw "cargo build --release -p tail-maker-external 失败 (exit code: $LASTEXITCODE)"
+                throw "cargo build --release -p osu-tail-maker-external 失败 (exit code: $LASTEXITCODE)"
             }
             Write-Host "✅ 小工具编译完成" -ForegroundColor Green
         } finally {

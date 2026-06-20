@@ -6,7 +6,7 @@ authors = ["xuan_yuan"]
 license = ""
 repository = "https://github.com/2710165659/osu-manina-tail-maker"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.88.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -31,3 +31,10 @@ base64 = "0.22"
 thiserror = "2"
 zip = "2"
 shared = { path = "../../shared" }
+
+[profile.release]
+opt-level = "z"          # 追求体积最小化（优于 "s"）
+lto = true               # 启用链接时优化，可大幅消除死代码
+codegen-units = 1        # 降低并行编译粒度，让优化更激进
+panic = "abort"          # 去除 unwinding 支持，节省约 30–50 KB
+strip = true             # 剔除符号表（效果等同于手动 strip）

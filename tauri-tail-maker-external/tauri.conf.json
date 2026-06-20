@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "tail-maker-external",
+  "productName": "osu-tail-maker-external",
   "version": "0.1.0",
-  "identifier": "com.osu-mania.tail-maker-external",
+  "identifier": "com.osumania.tailmaker.external",
   "build": {
     "frontendDist": "./frontend"
   },

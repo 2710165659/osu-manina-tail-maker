@@ -2,181 +2,89 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ["v*"]
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
-  # ── 外部小工具 ──────────────────────────────────
-  build-external:
-    name: Build External Tool (${{ matrix.target }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary: tail-maker-external.exe
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            binary: tail-maker-external
-          - os: macos-13
-            target: x86_64-apple-darwin
-            binary: tail-maker-external
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            binary: tail-maker-external
-
-    runs-on: ${{ matrix.os }}
+  # ── 构建（Windows 单平台：外部小工具 + 主应用） ──
+  build:
+    name: Build (Windows)
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.77.2'
-          targets: ${{ matrix.target }}
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-ext-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-ext-
-
-      - name: Build external tool
-        run: cargo build --release --target ${{ matrix.target }} -p tail-maker-external
-
-      - name: Upload external tool artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: external-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ matrix.binary }}
-          if-no-files-found: error
-
-  # ── 主工具 ──────────────────────────────────────
-  build-main:
-    name: Build Main App (${{ matrix.target }})
-    needs: build-external
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Windows
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            ext_binary: tail-maker-external.exe
-            ext_artifact: external-x86_64-pc-windows-msvc
-          # macOS Apple Silicon
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            ext_binary: tail-maker-external
-            ext_artifact: external-aarch64-apple-darwin
-          # macOS Intel
-          - os: macos-13
-            target: x86_64-apple-darwin
-            ext_binary: tail-maker-external
-            ext_artifact: external-x86_64-apple-darwin
-          # Linux
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            ext_binary: tail-maker-external
-            ext_artifact: external-x86_64-unknown-linux-gnu
-
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@v4
+      # 版本校验尽早执行，避免 tag 与配置不一致时白白编译
+      - name: Check version matches tag
+        shell: bash
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          CONFIG_VERSION=$(jq -r '.version' tauri-tail-maker/src-tauri/tauri.conf.json)
+          if [ "$TAG_VERSION" != "$CONFIG_VERSION" ]; then
+            echo "ERROR: Git tag 'v$TAG_VERSION' does not match tauri.conf.json version '$CONFIG_VERSION'"
+            echo "Please update the version field in tauri.conf.json before pushing the tag."
+            exit 1
+          fi
+          echo "Version check passed: tag=v$TAG_VERSION  config=$CONFIG_VERSION"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: "npm"
+          cache-dependency-path: tauri-tail-maker/package-lock.json
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: '1.77.2'
-          targets: ${{ matrix.target }}
+          targets: x86_64-pc-windows-msvc
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
-            librsvg2-dev patchelf libssl-dev libgtk-3-dev libjavascriptcoregtk-4.1-dev \
-            libsoup-3.0-dev
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-main-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-main-
+          key: x86_64-pc-windows-msvc
 
       - name: Install npm dependencies
         working-directory: tauri-tail-maker
         run: npm ci
 
-      - name: Download external tool artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ matrix.ext_artifact }}
-          path: target/release/
+      # ---- 运行本地构建脚本 ----
+      - name: Run production build script
+        shell: pwsh
+        run: ./run-build.ps1
 
-      - name: Prepare external tool binary
-        shell: bash
-        run: |
-          mkdir -p target/release
-          chmod +x "target/release/${{ matrix.ext_binary }}" 2>/dev/null || true
-
-          # tauri.conf.json resources 和 Rust 代码均硬编码 .exe 后缀
-          # 非 Windows 平台需要重命名以匹配
-          if [ "${{ matrix.ext_binary }}" != "tail-maker-external.exe" ]; then
-            mv "target/release/${{ matrix.ext_binary }}" "target/release/tail-maker-external.exe"
-          fi
-
-          echo "External tool prepared: $(ls -lh target/release/tail-maker-external.exe)"
-
-      - name: Build main app
-        working-directory: tauri-tail-maker
-        shell: bash
-        run: |
-          # tauri.conf.json 中 beforeBuildCommand 会再次执行 npm run build
-          # 此处先显式构建前端以尽早暴露错误，tauri build 内部会做增量构建
-          npm run build
-          npx tauri build --target ${{ matrix.target }}
-
-      - name: Upload main app artifacts
+      - name: Upload main app exe
         uses: actions/upload-artifact@v4
         with:
-          name: main-${{ matrix.target }}
-          path: |
-            tauri-tail-maker/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
-          if-no-files-found: warn
+          name: main-app
+          path: ./target/release/osu-mania-tail-maker.exe
+          if-no-files-found: error
+
+      - name: Upload external tool exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-tool
+          path: ./target/release/osu-tail-maker-external.exe
+          if-no-files-found: error
 
   # ── 创建 Release ───────────────────────────────
   create-release:
     name: Create GitHub Release
-    needs: build-main
+    needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: main-*
+          name: main-app
           path: artifacts/
-          merge-multiple: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: external-tool
+          path: artifacts/
 
       - name: List artifacts
         run: find artifacts/ -type f -ls
@@ -186,7 +94,7 @@ jobs:
         with:
           files: |
             artifacts/**/*
-          draft: true
+          draft: false
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

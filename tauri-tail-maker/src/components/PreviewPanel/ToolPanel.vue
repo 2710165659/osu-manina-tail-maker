@@ -44,7 +44,6 @@
             <BatchGenerate v-if="activeTab === 'batchGenerate'" key="batchGenerate" />
             <SkinAdapter v-else-if="activeTab === 'skinAdapter'" key="skinAdapter" />
             <OneClickLength v-else-if="activeTab === 'oneClickLength'" key="oneClickLength" />
-            <AddScript v-else-if="activeTab === 'addScript'" key="addScript" />
           </Transition>
         </main>
       </div>
@@ -57,7 +56,6 @@ import { ref } from 'vue'
 import SkinAdapter from '../ToolPanel/SkinAdapter.vue'
 import OneClickLength from '../ToolPanel/OneClickLength.vue'
 import BatchGenerate from '../ToolPanel/BatchGenerate.vue'
-import AddScript from '../ToolPanel/AddScript.vue'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -75,10 +73,6 @@ const tabs = [
   {
     id: 'oneClickLength',
     label: '一键修改面尾',
-  },
-  {
-    id: 'addScript',
-    label: '为皮肤添加脚本',
   }
 ]
 </script>

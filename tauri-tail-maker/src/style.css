@@ -3,8 +3,10 @@
    Design System & Global Styles
    ============================================ */
 
-/* --- Font Import --- */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+/* --- Fonts --- */
+/* 使用系统自带字体，避免 @import 阻塞渲染。
+ * JetBrains Mono → 等宽字体回退链
+ * Noto Sans SC → 中文无衬线回退链 */
 
 /* --- CSS Variables --- */
 :root {
@@ -60,7 +62,7 @@ html, body {
   overflow: hidden;
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -148,7 +150,7 @@ body::before {
   margin-bottom: 4px;
 }
 .unit {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 10px;
   color: var(--text-muted);
   font-weight: 400;
@@ -165,7 +167,7 @@ body::before {
 }
 .field-info strong {
   color: var(--accent-purple);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
 }
 
 /* --- Inputs --- */
@@ -181,7 +183,7 @@ body::before {
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 13px;
-  font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   outline: none;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
@@ -241,7 +243,7 @@ body::before {
   background: linear-gradient(to right, var(--accent-purple) var(--slider-pct, 0%), rgba(255, 255, 255, 0.2) var(--slider-pct, 0%));
 }
 .slider-val {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 12px;
   color: var(--accent-purple);
   min-width: 28px;
@@ -343,7 +345,7 @@ body::before {
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .color-picker::-webkit-color-swatch { border-radius: 2px; border: none; }
 .color-hex {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 12px;
   color: var(--text-secondary);
   letter-spacing: 0.5px;
